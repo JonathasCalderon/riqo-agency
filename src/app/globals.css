@@ -1,0 +1,77 @@
+@import "tailwindcss";
+
+:root {
+  --background: #f8f5f0;
+  --foreground: #20231F;
+  --primary: #3E92CC;
+  --primary-foreground: #f8f5f0;
+  --secondary: #20231F;
+  --secondary-foreground: #f8f5f0;
+  --muted: #F0EBE1;
+  --muted-foreground: #20231F;
+  --accent: #3E92CC;
+  --accent-foreground: #f8f5f0;
+  --destructive: #ef4444;
+  --destructive-foreground: #f8f5f0;
+  --border: #e5e7eb;
+  --input: #F0EBE1;
+  --ring: #3E92CC;
+  --card: #F0EBE1;
+  --card-foreground: #20231F;
+}
+
+@theme inline {
+  --color-background: var(--background);
+  --color-foreground: var(--foreground);
+  --color-primary: var(--primary);
+  --color-primary-foreground: var(--primary-foreground);
+  --color-secondary: var(--secondary);
+  --color-secondary-foreground: var(--secondary-foreground);
+  --color-muted: var(--muted);
+  --color-muted-foreground: var(--muted-foreground);
+  --color-accent: var(--accent);
+  --color-accent-foreground: var(--accent-foreground);
+  --color-destructive: var(--destructive);
+  --color-destructive-foreground: var(--destructive-foreground);
+  --color-border: var(--border);
+  --color-input: var(--input);
+  --color-ring: var(--ring);
+  --color-card: var(--card);
+  --color-card-foreground: var(--card-foreground);
+  --font-sans: ui-sans-serif, system-ui, sans-serif;
+  --font-mono: ui-monospace, SFMono-Regular, monospace;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root {
+    --background: #20231F;
+    --foreground: #f8f5f0;
+    --primary: #3E92CC;
+    --primary-foreground: #20231F;
+    --secondary: #f8f5f0;
+    --secondary-foreground: #20231F;
+    --muted: #20231F;
+    --muted-foreground: #f8f5f0;
+    --accent: #3E92CC;
+    --accent-foreground: #20231F;
+    --border: #374151;
+    --input: #20231F;
+    --ring: #3E92CC;
+    --card: #20231F;
+    --card-foreground: #f8f5f0;
+  }
+}
+
+body {
+  background: var(--background);
+  color: var(--foreground);
+  font-family: var(--font-sans);
+}
+
+* {
+  border-color: var(--border);
+}
+
+html {
+  scroll-behavior: smooth;
+}
