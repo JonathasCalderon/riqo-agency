@@ -3,9 +3,33 @@ import { ClientDatabaseManager } from '@/lib/supabase/client-db'
 import { NextRequest, NextResponse } from 'next/server'
 import { writeFile, mkdir, rm } from 'fs/promises'
 import { join } from 'path'
+import { tmpdir } from 'os'
 import { spawn } from 'child_process'
 import { readFile } from 'fs/promises'
 import Papa from 'papaparse'
+
+/**
+ * Get a safe temporary directory path for the upload
+ */
+function getTempDir(uploadId: string): string {
+  // Use system temp directory for production compatibility
+  return join(tmpdir(), 'riqo-uploads', uploadId)
+}
+
+/**
+ * Ensure temp directory exists and is writable
+ */
+async function ensureTempDir(uploadId: string): Promise<string> {
+  const tempDir = getTempDir(uploadId)
+  try {
+    await mkdir(tempDir, { recursive: true })
+    console.log(`Created/verified temp directory: ${tempDir}`)
+    return tempDir
+  } catch (error) {
+    console.error('Error creating temp directory:', error)
+    throw new Error(`Failed to create temporary directory: ${error instanceof Error ? error.message : 'Unknown error'}`)
+  }
+}
 
 export async function POST(request: NextRequest) {
   try {
@@ -118,6 +142,11 @@ export async function POST(request: NextRequest) {
  */
 async function processFileAsync(file: File, profile: any, uploadId: string, supabase: any) {
   try {
+    console.log(`Starting file processing for upload ${uploadId}`)
+    console.log(`Environment: ${process.env.NODE_ENV}`)
+    console.log(`Platform: ${process.platform}`)
+    console.log(`System temp dir: ${tmpdir()}`)
+
     // Update status to processing
     await supabase
       .from('data_uploads')
@@ -127,23 +156,21 @@ async function processFileAsync(file: File, profile: any, uploadId: string, supa
       })
       .eq('id', uploadId)
 
-    // Create temporary directory
-    const tempDir = join(process.cwd(), 'temp', uploadId)
-    try {
-      await mkdir(tempDir, { recursive: true })
-    } catch (error) {
-      console.error('Error creating temp directory:', error)
-      throw new Error('Failed to create temporary directory')
-    }
+    // Create temporary directory using helper function
+    const tempDir = await ensureTempDir(uploadId)
 
     // Save uploaded file
     const buffer = Buffer.from(await file.arrayBuffer())
     const inputPath = join(tempDir, file.name)
     try {
       await writeFile(inputPath, buffer)
+      console.log(`Successfully saved file to: ${inputPath} (${buffer.length} bytes)`)
     } catch (error) {
       console.error('Error writing file:', error)
-      throw new Error('Failed to save uploaded file')
+      console.error('Temp directory:', tempDir)
+      console.error('Input path:', inputPath)
+      console.error('Buffer length:', buffer.length)
+      throw new Error(`Failed to save uploaded file: ${error instanceof Error ? error.message : 'Unknown error'}`)
     }
 
     // For now, let's skip Excel conversion and Python processing to get basic CSV upload working
@@ -238,8 +265,8 @@ async function processFileAsync(file: File, profile: any, uploadId: string, supa
 
     // Clean up temporary directory
     try {
-      const tempDir = join(process.cwd(), 'temp', uploadId)
       await rm(tempDir, { recursive: true, force: true })
+      console.log(`Cleaned up temp directory: ${tempDir}`)
     } catch (cleanupError) {
       console.warn('Failed to clean up temp directory:', cleanupError)
     }
@@ -249,8 +276,9 @@ async function processFileAsync(file: File, profile: any, uploadId: string, supa
 
     // Clean up temporary directory on error
     try {
-      const tempDir = join(process.cwd(), 'temp', uploadId)
-      await rm(tempDir, { recursive: true, force: true })
+      const errorTempDir = getTempDir(uploadId)
+      await rm(errorTempDir, { recursive: true, force: true })
+      console.log(`Cleaned up temp directory after error: ${errorTempDir}`)
     } catch (cleanupError) {
       console.warn('Failed to clean up temp directory after error:', cleanupError)
     }
