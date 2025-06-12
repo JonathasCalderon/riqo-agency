@@ -47,13 +47,13 @@ function DashboardContent() {
     if (!file) return
 
     if (!hasClientDatabase) {
-      setUploadStatus('❌ Client database not configured. Please contact support to set up your data visualization environment.')
+      setUploadStatus(`❌ ${t('clientDatabaseNotConfigured')}`)
       setTimeout(() => setUploadStatus(''), 10000)
       return
     }
 
     setUploading(true)
-    setUploadStatus('Uploading file...')
+    setUploadStatus(t('uploadingFile'))
 
     try {
       const formData = new FormData()
@@ -67,15 +67,15 @@ function DashboardContent() {
       const result = await response.json()
 
       if (response.ok) {
-        setUploadStatus('File uploaded successfully! Processing...')
+        setUploadStatus(t('fileUploadedSuccessfully'))
         // Poll for processing status
         pollUploadStatus(result.uploadId)
         setFile(null)
       } else {
-        throw new Error(result.error || 'Upload failed')
+        throw new Error(result.error || t('uploadFailed'))
       }
     } catch (error) {
-      setUploadStatus(`Upload failed: ${error instanceof Error ? error.message : 'Unknown error'}`)
+      setUploadStatus(`${t('uploadFailed')}: ${error instanceof Error ? error.message : t('unknownError')}`)
       setTimeout(() => setUploadStatus(''), 5000)
     } finally {
       setUploading(false)
@@ -93,18 +93,18 @@ function DashboardContent() {
 
         if (response.ok) {
           const statusText = result.rows_processed
-            ? `${result.rows_processed} rows, ${result.columns_processed || 0} columns`
-            : 'processing...'
+            ? `${result.rows_processed} ${t('rows')}, ${result.columns_processed || 0} ${t('columns')}`
+            : t('processing')
 
-          setUploadStatus(`Status: ${result.status} (${statusText})`)
+          setUploadStatus(`${t('status')}: ${result.status} (${statusText})`)
 
           if (result.status === 'completed') {
-            const syncStatus = result.client_database_synced ? '✅ Synced to dashboard' : '⚠️ Sync pending'
-            setUploadStatus(`✅ Upload completed successfully! ${syncStatus}`)
+            const syncStatus = result.client_database_synced ? `✅ ${t('syncedToDashboard')}` : `⚠️ ${t('syncPending')}`
+            setUploadStatus(`✅ ${t('uploadCompletedSuccessfully')} ${syncStatus}`)
             setTimeout(() => setUploadStatus(''), 8000)
             return
           } else if (result.status === 'failed') {
-            setUploadStatus(`❌ Upload failed: ${result.error_message || 'Unknown error'}`)
+            setUploadStatus(`❌ ${t('uploadFailedError')}: ${result.error_message || t('unknownError')}`)
             setTimeout(() => setUploadStatus(''), 10000)
             return
           }
@@ -114,12 +114,12 @@ function DashboardContent() {
         if (attempts < maxAttempts) {
           setTimeout(poll, 10000) // Poll every 10 seconds
         } else {
-          setUploadStatus('⏱️ Upload is taking longer than expected. Please check back later.')
+          setUploadStatus(`⏱️ ${t('uploadTakingLonger')}`)
           setTimeout(() => setUploadStatus(''), 10000)
         }
       } catch (error) {
         console.error('Error polling upload status:', error)
-        setUploadStatus('Error checking upload status')
+        setUploadStatus(t('errorCheckingUploadStatus'))
         setTimeout(() => setUploadStatus(''), 5000)
       }
     }
@@ -174,13 +174,13 @@ function DashboardContent() {
                         <div className={`w-3 h-3 rounded-full ${hasClientDatabase ? 'bg-green-500' : 'bg-yellow-500'}`}></div>
                         <div>
                           <p className="font-medium">
-                            {clientConfig.name || 'Your Account'}
+                            {clientConfig.name || t('yourAccount')}
                             {clientConfig.company && ` - ${clientConfig.company}`}
                           </p>
                           <p className="text-sm text-muted-foreground">
                             {hasClientDatabase
-                              ? '✅ Database configured - Ready for uploads'
-                              : '⚠️ Database not configured - Contact support'}
+                              ? `✅ ${t('databaseConfigured')}`
+                              : `⚠️ ${t('databaseNotConfigured')}`}
                           </p>
                         </div>
                       </div>
@@ -199,7 +199,7 @@ function DashboardContent() {
                       className="cursor-pointer"
                     />
                     <p className="text-xs text-muted-foreground mt-1">
-                      Supports CSV and Excel files (max 50MB)
+                      {t('supportsFiles')}
                     </p>
                   </div>
 

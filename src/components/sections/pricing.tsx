@@ -121,9 +121,9 @@ export function PricingSection() {
             <Card className="border-2 border-secondary/20">
               <CardHeader className="text-center">
                 <div className="w-16 h-16 bg-secondary/10 rounded-full flex items-center justify-center mx-auto mb-4">
-                  <span className="text-2xl font-bold text-secondary-foreground">2</span>
+                  <span className="text-2xl font-bold text-foreground">2</span>
                 </div>
-                <CardTitle className="text-2xl text-secondary-foreground">{t('phase2Title')}</CardTitle>
+                <CardTitle className="text-2xl text-foreground">{t('phase2Title')}</CardTitle>
                 <CardDescription className="text-lg mt-2">
                   {t('phase2Subtitle')}
                 </CardDescription>
