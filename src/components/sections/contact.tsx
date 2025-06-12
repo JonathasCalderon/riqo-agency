@@ -63,7 +63,7 @@ export function ContactSection() {
                 </div>
                 <div>
                   <div className="font-medium text-foreground">{t('email')}</div>
-                  <div className="text-muted-foreground">hello@riqo.agency</div>
+                  <div className="text-muted-foreground">calderonjonathas@gmail.com</div>
                 </div>
               </div>
 
@@ -73,7 +73,7 @@ export function ContactSection() {
                 </div>
                 <div>
                   <div className="font-medium text-foreground">{t('phone')}</div>
-                  <div className="text-muted-foreground">+1 (555) 123-4567</div>
+                  <div className="text-muted-foreground">+591 77906005</div>
                 </div>
               </div>
 

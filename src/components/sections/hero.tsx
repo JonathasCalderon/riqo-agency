@@ -26,12 +26,12 @@ export function HeroSection() {
 
           <div className="flex flex-col sm:flex-row gap-4 justify-center mb-16">
             <Link href="/auth/signup">
-              <Button size="lg" className="text-lg px-8 py-6">
+              <Button size="lg" className="text-lg px-8 py-6 cursor-pointer">
                 {t('startJourney')}
               </Button>
             </Link>
             <Link href="/#services">
-              <Button variant="outline" size="lg" className="text-lg px-8 py-6">
+              <Button variant="outline" size="lg" className="text-lg px-8 py-6 cursor-pointer">
                 {t('exploreServices')}
               </Button>
             </Link>

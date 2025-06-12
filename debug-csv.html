@@ -1,0 +1,160 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Debug CSV Upload</title>
+    <style>
+        body { font-family: Arial, sans-serif; max-width: 1000px; margin: 0 auto; padding: 20px; }
+        .form-group { margin-bottom: 15px; }
+        label { display: block; margin-bottom: 5px; font-weight: bold; }
+        input { width: 100%; padding: 8px; border: 1px solid #ddd; border-radius: 4px; }
+        button { background: #007bff; color: white; padding: 10px 20px; border: none; border-radius: 4px; cursor: pointer; }
+        button:hover { background: #0056b3; }
+        .result { margin-top: 20px; padding: 10px; border-radius: 4px; }
+        .success { background: #d4edda; border: 1px solid #c3e6cb; color: #155724; }
+        .error { background: #f8d7da; border: 1px solid #f5c6cb; color: #721c24; }
+        pre { background: #f8f9fa; padding: 10px; border-radius: 4px; overflow-x: auto; }
+        .columns { display: grid; grid-template-columns: 1fr 1fr; gap: 20px; margin-top: 20px; }
+    </style>
+</head>
+<body>
+    <h1>Debug CSV Upload</h1>
+    
+    <p>This tool helps debug CSV parsing issues. Upload your CSV to see exactly what columns and data are detected.</p>
+
+    <form id="debugForm">
+        <div class="form-group">
+            <label for="csvFile">Select CSV File:</label>
+            <input type="file" id="csvFile" accept=".csv" required>
+        </div>
+        <button type="submit">Debug CSV</button>
+    </form>
+
+    <div id="result"></div>
+
+    <script>
+        document.getElementById('debugForm').addEventListener('submit', async (e) => {
+            e.preventDefault();
+            
+            const resultDiv = document.getElementById('result');
+            const fileInput = document.getElementById('csvFile');
+            const file = fileInput.files[0];
+            
+            if (!file) {
+                resultDiv.innerHTML = '<div class="result error">Please select a file</div>';
+                return;
+            }
+            
+            resultDiv.innerHTML = 'Analyzing CSV...';
+            
+            try {
+                const formData = new FormData();
+                formData.append('file', file);
+                
+                const response = await fetch('/api/debug-csv', {
+                    method: 'POST',
+                    body: formData
+                });
+                
+                const result = await response.json();
+                
+                if (response.ok) {
+                    resultDiv.innerHTML = `
+                        <div class="result success">
+                            <h3>✅ CSV Analysis Results</h3>
+                            <p><strong>File:</strong> ${result.filename} (${(result.size / 1024).toFixed(2)} KB)</p>
+                            <p><strong>Total Rows:</strong> ${result.total_rows}</p>
+                            
+                            <div class="columns">
+                                <div>
+                                    <h4>CSV Headers (${result.headers.length}):</h4>
+                                    <pre>${result.headers.join('\n')}</pre>
+                                </div>
+                                
+                                <div>
+                                    <h4>Expected Table Columns:</h4>
+                                    <pre>id
+fecha
+hora
+clienteId
+cliente
+oficina
+vendedor
+vendedorId
+vendedorUsername
+distribuidor
+distribuidorId
+distribuidorUsername
+zona
+tipoPago
+productoId
+codigo
+producto
+categoria
+dpGroup
+cantidad
+cantidadCajas
+precioUnitario
+precioPaquete
+monto
+descuento
+descuento2
+descuentoSocio
+montoFinal
+proveedor
+tipoNegocio
+nroFactura
+cuf
+razonSocial
+nit
+mes
+supervisor
+ventaId
+preVentaId
+ruta
+diaVisita
+precioLista
+codigoProducto
+canal
+tipoObjeto
+mercado
+empresa
+jerarquia1
+jerarquia2
+jerarquia3
+descuentoGrupo
+descuentoVolumen
+escalaDescuento
+escalaProducto
+cluster
+descripcionUnificada
+marca
+fecha_formateada</pre>
+                                </div>
+                            </div>
+                            
+                            <h4>Sample Data:</h4>
+                            <pre>${JSON.stringify(result.sample_data, null, 2)}</pre>
+                            
+                            ${result.errors.length > 0 ? `
+                                <h4>Parsing Errors:</h4>
+                                <pre>${JSON.stringify(result.errors, null, 2)}</pre>
+                            ` : ''}
+                        </div>
+                    `;
+                } else {
+                    throw new Error(result.error || 'Analysis failed');
+                }
+            } catch (error) {
+                resultDiv.innerHTML = `
+                    <div class="result error">
+                        <h3>❌ Analysis failed</h3>
+                        <p>${error.message}</p>
+                    </div>
+                `;
+            }
+        });
+    </script>
+</body>
+</html>

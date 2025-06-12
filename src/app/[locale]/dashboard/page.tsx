@@ -1,93 +1,155 @@
 "use client"
 
-import { useState } from "react"
+import { useState, useEffect } from "react"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Input } from "@/components/ui/input"
-import { Upload, FileText, BarChart3, Settings } from "lucide-react"
-import Image from "next/image"
+import { Upload, FileText, BarChart3 } from "lucide-react"
 import { useTranslations } from 'next-intl'
-import { Link } from '@/i18n/routing'
 import { useAuth } from '@/lib/auth/auth-context'
 import { ProtectedRoute } from '@/components/auth/protected-route'
+import { Navigation } from '@/components/navigation'
 
 function DashboardContent() {
   const [file, setFile] = useState<File | null>(null)
   const [uploading, setUploading] = useState(false)
-  const { user, signOut } = useAuth()
+  const [uploadStatus, setUploadStatus] = useState<string>('')
+  const [clientConfig, setClientConfig] = useState<any>(null)
+  const [hasClientDatabase, setHasClientDatabase] = useState(false)
+  const { user } = useAuth()
   const t = useTranslations('dashboard')
 
-  const handleSignOut = async () => {
-    await signOut()
+  // Load user's client configuration on component mount
+  useEffect(() => {
+    loadClientConfig()
+  }, [user])
+
+  const loadClientConfig = async () => {
+    if (!user) return
+
+    try {
+      const response = await fetch('/api/clients')
+      if (response.ok) {
+        const data = await response.json()
+        if (data.clients?.length > 0) {
+          const config = data.clients[0]
+          setClientConfig(config)
+          setHasClientDatabase(config.has_client_database)
+        }
+      }
+    } catch (error) {
+      console.error('Error loading client config:', error)
+    }
   }
 
   const handleFileUpload = async (e: React.FormEvent) => {
     e.preventDefault()
     if (!file) return
 
-    setUploading(true)
-    try {
-      // Here you would implement the actual file upload logic
-      // For now, we'll just simulate the upload
-      await new Promise(resolve => setTimeout(resolve, 2000))
+    if (!hasClientDatabase) {
+      setUploadStatus('❌ Client database not configured. Please contact support to set up your data visualization environment.')
+      setTimeout(() => setUploadStatus(''), 10000)
+      return
+    }
 
-      // Reset form
-      setFile(null)
-      alert("File uploaded successfully! (This is a demo)")
+    setUploading(true)
+    setUploadStatus('Uploading file...')
+
+    try {
+      const formData = new FormData()
+      formData.append('file', file)
+
+      const response = await fetch('/api/upload', {
+        method: 'POST',
+        body: formData
+      })
+
+      const result = await response.json()
+
+      if (response.ok) {
+        setUploadStatus('File uploaded successfully! Processing...')
+        // Poll for processing status
+        pollUploadStatus(result.uploadId)
+        setFile(null)
+      } else {
+        throw new Error(result.error || 'Upload failed')
+      }
     } catch (error) {
-      alert("Upload failed. Please try again.")
+      setUploadStatus(`Upload failed: ${error instanceof Error ? error.message : 'Unknown error'}`)
+      setTimeout(() => setUploadStatus(''), 5000)
     } finally {
       setUploading(false)
     }
+  }
+
+  const pollUploadStatus = async (uploadId: string) => {
+    const maxAttempts = 30 // 5 minutes max
+    let attempts = 0
+
+    const poll = async () => {
+      try {
+        const response = await fetch(`/api/upload/status/${uploadId}`)
+        const result = await response.json()
+
+        if (response.ok) {
+          const statusText = result.rows_processed
+            ? `${result.rows_processed} rows, ${result.columns_processed || 0} columns`
+            : 'processing...'
+
+          setUploadStatus(`Status: ${result.status} (${statusText})`)
+
+          if (result.status === 'completed') {
+            const syncStatus = result.client_database_synced ? '✅ Synced to dashboard' : '⚠️ Sync pending'
+            setUploadStatus(`✅ Upload completed successfully! ${syncStatus}`)
+            setTimeout(() => setUploadStatus(''), 8000)
+            return
+          } else if (result.status === 'failed') {
+            setUploadStatus(`❌ Upload failed: ${result.error_message || 'Unknown error'}`)
+            setTimeout(() => setUploadStatus(''), 10000)
+            return
+          }
+        }
+
+        attempts++
+        if (attempts < maxAttempts) {
+          setTimeout(poll, 10000) // Poll every 10 seconds
+        } else {
+          setUploadStatus('⏱️ Upload is taking longer than expected. Please check back later.')
+          setTimeout(() => setUploadStatus(''), 10000)
+        }
+      } catch (error) {
+        console.error('Error polling upload status:', error)
+        setUploadStatus('Error checking upload status')
+        setTimeout(() => setUploadStatus(''), 5000)
+      }
+    }
+
+    poll()
   }
 
 
 
   return (
     <div className="min-h-screen bg-background">
-      {/* Header */}
-      <header className="bg-background border-b border-border">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="flex justify-between items-center h-16">
-            <Link href="/" className="flex items-center space-x-2">
-              <Image
-                src="/riqo-logo.svg"
-                alt="Riqo"
-                width={150}
-                height={50}
-                className="h-8 w-auto dark:hidden"
-              />
-              <Image
-                src="/riqo-logo-light.svg"
-                alt="Riqo"
-                width={150}
-                height={50}
-                className="h-8 w-auto hidden dark:block"
-              />
-            </Link>
-
-            <div className="flex items-center space-x-4">
-              <span className="text-sm text-muted-foreground">
-                {t('welcome')}, {user?.user_metadata?.full_name || user?.email}
-              </span>
-              <Button variant="ghost" size="icon">
-                <Settings className="h-4 w-4" />
-              </Button>
-              <Button variant="ghost" size="icon" onClick={handleSignOut}>
-                <Settings className="h-4 w-4" />
-              </Button>
-            </div>
-          </div>
-        </div>
-      </header>
+      {/* Navigation */}
+      <Navigation />
 
       {/* Main Content */}
       <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
         <div className="mb-8">
-          <h1 className="text-3xl font-bold text-foreground">{t('title')}</h1>
-          <p className="text-muted-foreground mt-2">
-            {t('description')}
-          </p>
+          <div className="flex items-center justify-between">
+            <div>
+              <h1 className="text-3xl font-bold text-foreground">{t('title')}</h1>
+              <p className="text-muted-foreground mt-2">
+                {t('description')}
+              </p>
+            </div>
+            <div className="text-right">
+              <p className="text-sm text-muted-foreground">
+                {t('welcome')}, {user?.user_metadata?.full_name || user?.email}
+              </p>
+            </div>
+          </div>
         </div>
 
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
@@ -105,6 +167,26 @@ function DashboardContent() {
               </CardHeader>
               <CardContent>
                 <form onSubmit={handleFileUpload} className="space-y-6">
+                  {/* Client Configuration Status */}
+                  {clientConfig && (
+                    <div className="bg-muted/50 rounded-lg p-4">
+                      <div className="flex items-center space-x-3">
+                        <div className={`w-3 h-3 rounded-full ${hasClientDatabase ? 'bg-green-500' : 'bg-yellow-500'}`}></div>
+                        <div>
+                          <p className="font-medium">
+                            {clientConfig.name || 'Your Account'}
+                            {clientConfig.company && ` - ${clientConfig.company}`}
+                          </p>
+                          <p className="text-sm text-muted-foreground">
+                            {hasClientDatabase
+                              ? '✅ Database configured - Ready for uploads'
+                              : '⚠️ Database not configured - Contact support'}
+                          </p>
+                        </div>
+                      </div>
+                    </div>
+                  )}
+
                   <div>
                     <label htmlFor="file" className="block text-sm font-medium text-foreground mb-2">
                       {t('selectFile')}
@@ -112,10 +194,13 @@ function DashboardContent() {
                     <Input
                       id="file"
                       type="file"
-                      accept=".csv"
+                      accept=".csv,.xlsx,.xls"
                       onChange={(e) => setFile(e.target.files?.[0] || null)}
                       className="cursor-pointer"
                     />
+                    <p className="text-xs text-muted-foreground mt-1">
+                      Supports CSV and Excel files (max 50MB)
+                    </p>
                   </div>
 
                   {file && (
@@ -132,9 +217,16 @@ function DashboardContent() {
                     </div>
                   )}
 
+                  {/* Upload Status */}
+                  {uploadStatus && (
+                    <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
+                      <p className="text-sm text-blue-800">{uploadStatus}</p>
+                    </div>
+                  )}
+
                   <Button
                     type="submit"
-                    disabled={!file || uploading}
+                    disabled={!file || uploading || !hasClientDatabase}
                     className="w-full"
                   >
                     {uploading ? t('uploading') : t('uploadButton')}

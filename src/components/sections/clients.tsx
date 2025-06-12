@@ -12,7 +12,7 @@ export function ClientsSection() {
       name: "CompraFácil S.R.L.",
       logo: "/clients/comprafacil-logo.svg",
       logoLight: "/clients/comprafacil-logo.svg", // Same logo works for both modes
-      website: "#", // Add their website URL when available
+      website: "https://www.facebook.com/p/Comprafacil-SRL-100039586914355/", // Add their website URL when available
       description: "Servicios de Distribución"
     }
   ]
@@ -31,34 +31,39 @@ export function ClientsSection() {
 
         {/* Client Logos Grid */}
         {clients.length > 0 ? (
-          <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-8 items-center justify-items-center">
+          <div className="flex justify-center items-center">
             {clients.map((client, index) => (
               <div
                 key={index}
-                className="group relative p-6 rounded-lg hover:bg-background/50 transition-colors duration-200"
+                className="group relative p-12 rounded-xl hover:bg-background/50 transition-all duration-300 hover:shadow-lg"
               >
                 <a
                   href={client.website}
                   target="_blank"
                   rel="noopener noreferrer"
-                  className="block"
+                  className="block text-center"
                 >
                   {/* Light mode logo */}
                   <Image
                     src={client.logo}
                     alt={client.name}
-                    width={120}
-                    height={60}
-                    className="h-12 w-auto object-contain opacity-60 group-hover:opacity-100 transition-opacity duration-200 dark:hidden"
+                    width={300}
+                    height={150}
+                    className="h-24 w-auto object-contain opacity-70 group-hover:opacity-100 transition-opacity duration-300 dark:hidden mx-auto"
                   />
                   {/* Dark mode logo */}
                   <Image
                     src={client.logoLight || client.logo}
                     alt={client.name}
-                    width={120}
-                    height={60}
-                    className="h-12 w-auto object-contain opacity-60 group-hover:opacity-100 transition-opacity duration-200 hidden dark:block"
+                    width={300}
+                    height={150}
+                    className="h-24 w-auto object-contain opacity-70 group-hover:opacity-100 transition-opacity duration-300 hidden dark:block mx-auto"
                   />
+                  {/* Client description */}
+                  <div className="mt-4 opacity-0 group-hover:opacity-100 transition-opacity duration-300">
+                    <p className="text-sm font-medium text-foreground">{client.name}</p>
+                    <p className="text-xs text-muted-foreground mt-1">{client.description}</p>
+                  </div>
                 </a>
               </div>
             ))}

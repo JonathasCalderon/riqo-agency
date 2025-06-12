@@ -16,12 +16,21 @@ export function Footer() {
           {/* Company Info */}
           <div className="col-span-1 md:col-span-2">
             <Link href="/" className="flex items-center space-x-2 mb-4">
+              {/* Light mode - use dark logo on light background */}
               <Image
-                src="/riqo-logo-light.svg"
+                src="/riqo-logo-simple-light.svg"
                 alt="Riqo"
                 width={120}
                 height={40}
-                className="h-8 w-auto"
+                className="h-8 w-auto dark:hidden"
+              />
+              {/* Dark mode - use light logo on dark background */}
+              <Image
+                src="/riqo-logo-simple.svg"
+                alt="Riqo"
+                width={120}
+                height={40}
+                className="h-8 w-auto hidden dark:block"
               />
             </Link>
             <p className="text-secondary-foreground/80 mb-6 max-w-md">
@@ -30,15 +39,15 @@ export function Footer() {
             <div className="space-y-2">
               <div className="flex items-center space-x-3">
                 <Mail className="w-4 h-4" />
-                <span className="text-sm">hello@riqo.agency</span>
+                <span className="text-sm">calderonjonathas@gmail.com</span>
               </div>
               <div className="flex items-center space-x-3">
                 <Phone className="w-4 h-4" />
-                <span className="text-sm">+1 (555) 123-4567</span>
+                <span className="text-sm">+591 77906005</span>
               </div>
               <div className="flex items-center space-x-3">
                 <MapPin className="w-4 h-4" />
-                <span className="text-sm">Remote-first, Global reach</span>
+                <span className="text-sm">Remote First, Cochabamba, Bolivia</span>
               </div>
             </div>
           </div>

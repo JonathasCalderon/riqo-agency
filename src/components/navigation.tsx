@@ -46,7 +46,7 @@ export function Navigation() {
               alt="Riqo"
               width={250}
               height={120}
-              className="h-16 w-auto hidden sm:dark:block"
+              className="h-16 w-auto hidden dark:sm:block"
             />
             {/* Mobile Logo - Light Mode */}
             <Image
@@ -54,7 +54,7 @@ export function Navigation() {
               alt="Riqo"
               width={40}
               height={40}
-              className="h-10 w-10 sm:hidden dark:hidden"
+              className="h-10 w-10 block sm:hidden dark:hidden"
             />
             {/* Mobile Logo - Dark Mode */}
             <Image
@@ -62,7 +62,7 @@ export function Navigation() {
               alt="Riqo"
               width={40}
               height={40}
-              className="h-10 w-10 sm:hidden dark:block"
+              className="h-10 w-10 hidden dark:block dark:sm:hidden"
             />
           </Link>
 

@@ -1,0 +1,151 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Configure User for File Uploads</title>
+    <style>
+        body { font-family: Arial, sans-serif; max-width: 800px; margin: 0 auto; padding: 20px; }
+        .form-group { margin-bottom: 15px; }
+        label { display: block; margin-bottom: 5px; font-weight: bold; }
+        input, select { width: 100%; padding: 8px; border: 1px solid #ddd; border-radius: 4px; }
+        button { background: #007bff; color: white; padding: 10px 20px; border: none; border-radius: 4px; cursor: pointer; }
+        button:hover { background: #0056b3; }
+        .result { margin-top: 20px; padding: 10px; border-radius: 4px; }
+        .success { background: #d4edda; border: 1px solid #c3e6cb; color: #155724; }
+        .error { background: #f8d7da; border: 1px solid #f5c6cb; color: #721c24; }
+        .instructions { background: #e2e3e5; padding: 15px; border-radius: 4px; margin-bottom: 20px; }
+    </style>
+</head>
+<body>
+    <h1>Configure User for File Uploads</h1>
+    
+    <div class="instructions">
+        <h3>Before using this form:</h3>
+        <ol>
+            <li>Create a new Supabase project for the user</li>
+            <li>Run the SQL to create the client_data table in that project</li>
+            <li>Get the Project URL, Anon Key, and Service Role Key</li>
+            <li>Make sure you're logged in as an admin in your main Riqo app</li>
+        </ol>
+    </div>
+
+    <form id="configForm">
+        <div class="form-group">
+            <label for="userEmail">User Email (to identify the user):</label>
+            <input type="email" id="userEmail" required>
+        </div>
+
+        <div class="form-group">
+            <label for="company">Company Name:</label>
+            <input type="text" id="company" placeholder="e.g., Acme Corp">
+        </div>
+
+        <div class="form-group">
+            <label for="clientType">Client Type:</label>
+            <select id="clientType">
+                <option value="individual">Individual</option>
+                <option value="business" selected>Business</option>
+                <option value="enterprise">Enterprise</option>
+            </select>
+        </div>
+
+        <div class="form-group">
+            <label for="clientDatabaseUrl">Client Database URL:</label>
+            <input type="url" id="clientDatabaseUrl" placeholder="https://your-project-ref.supabase.co" required>
+        </div>
+
+        <div class="form-group">
+            <label for="clientDatabaseAnonKey">Client Database Anon Key:</label>
+            <input type="text" id="clientDatabaseAnonKey" placeholder="eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9..." required>
+        </div>
+
+        <div class="form-group">
+            <label for="clientDatabaseServiceKey">Client Database Service Key:</label>
+            <input type="text" id="clientDatabaseServiceKey" placeholder="eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9..." required>
+        </div>
+
+        <div class="form-group">
+            <label for="dataTableName">Data Table Name:</label>
+            <input type="text" id="dataTableName" value="client_data" placeholder="client_data">
+        </div>
+
+        <div class="form-group">
+            <label for="grafanaDashboardUrl">Grafana Dashboard URL (optional):</label>
+            <input type="url" id="grafanaDashboardUrl" placeholder="https://your-org.grafana.net/d/dashboard-id">
+        </div>
+
+        <button type="submit">Configure User</button>
+    </form>
+
+    <div id="result"></div>
+
+    <script>
+        document.getElementById('configForm').addEventListener('submit', async (e) => {
+            e.preventDefault();
+            
+            const resultDiv = document.getElementById('result');
+            resultDiv.innerHTML = 'Configuring user...';
+            
+            const formData = {
+                userEmail: document.getElementById('userEmail').value,
+                company: document.getElementById('company').value,
+                client_type: document.getElementById('clientType').value,
+                client_database_url: document.getElementById('clientDatabaseUrl').value,
+                client_database_anon_key: document.getElementById('clientDatabaseAnonKey').value,
+                client_database_service_key: document.getElementById('clientDatabaseServiceKey').value,
+                data_table_name: document.getElementById('dataTableName').value || 'client_data',
+                grafana_dashboard_url: document.getElementById('grafanaDashboardUrl').value
+            };
+
+            try {
+                // First, get the user ID from email
+                const userResponse = await fetch('/api/admin/get-user-by-email', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ email: formData.userEmail })
+                });
+
+                if (!userResponse.ok) {
+                    throw new Error('User not found or you need admin access');
+                }
+
+                const userData = await userResponse.json();
+                const userId = userData.user.id;
+
+                // Now configure the user
+                const configResponse = await fetch('/api/admin/configure-user', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        userId: userId,
+                        ...formData
+                    })
+                });
+
+                const result = await configResponse.json();
+
+                if (configResponse.ok) {
+                    resultDiv.innerHTML = `
+                        <div class="result success">
+                            <h3>✅ User configured successfully!</h3>
+                            <p>User ${formData.userEmail} can now upload CSV files.</p>
+                            <p>They should refresh their dashboard to see the upload option.</p>
+                        </div>
+                    `;
+                } else {
+                    throw new Error(result.error || 'Configuration failed');
+                }
+            } catch (error) {
+                resultDiv.innerHTML = `
+                    <div class="result error">
+                        <h3>❌ Configuration failed</h3>
+                        <p>${error.message}</p>
+                        <p>Make sure you're logged in as an admin and the user exists.</p>
+                    </div>
+                `;
+            }
+        });
+    </script>
+</body>
+</html>

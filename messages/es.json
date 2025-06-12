@@ -39,46 +39,55 @@
     "realtimeProcessingDesc": "Procesa y visualiza datos en streaming en tiempo real para insights y acciones inmediatas."
   },
   "pricing": {
-    "title": "Precios Simples y Transparentes",
-    "description": "Elige el plan que se adapte a tus necesidades. Todos los planes incluyen nuestras características principales sin tarifas ocultas o cargos sorpresa.",
+    "title": "Precios Transparentes de Dos Fases",
+    "description": "Primero, construimos tu solución personalizada de visualización de datos. Luego, elige un plan mensual para actualizaciones y mantenimiento continuo.",
     "mostPopular": "Más Popular",
-    "starter": "Inicial",
-    "starterPrice": "$99",
-    "starterPeriod": "/mes",
-    "starterDesc": "Perfecto para pequeñas empresas que comienzan con visualización de datos",
-    "professional": "Profesional",
-    "professionalPrice": "$299",
-    "professionalPeriod": "/mes",
-    "professionalDesc": "Ideal para empresas en crecimiento con necesidades complejas de datos",
-    "enterprise": "Empresarial",
-    "enterprisePrice": "Personalizado",
-    "enterpriseDesc": "Soluciones personalizadas para grandes organizaciones con requisitos específicos",
-    "contactSales": "Contactar Ventas",
-    "getStarted": "Comenzar",
-    "trialNote": "Todos los planes incluyen una prueba gratuita de 14 días. No se requiere tarjeta de crédito.",
+
+    "phase1Title": "Desarrollo Inicial",
+    "phase1Subtitle": "Configuración Personalizada de Dashboard y Visualización",
+    "phase1Price": "Contáctanos",
+    "phase1PriceDesc": "El precio varía según las necesidades y objetivos del cliente, de acuerdo a lo que quieren lograr",
+
+    "phase2Title": "Suscripción Mensual",
+    "phase2Subtitle": "Actualizaciones de Datos y Mantenimiento Continuo",
+    "phase2Description": "Después de tu configuración inicial, elige un plan mensual para actualizaciones de datos, reportes y soporte continuo.",
+    "chooseYourPlan": "Elige tu plan de mantenimiento continuo:",
+
+    "monthlyPlansTitle": "Planes de Suscripción Mensual",
+
+    "basic": "Básico",
+    "basicPrice": "30$",
+    "basicPeriod": "/mes",
+    "basicDesc": "Incluye todas las características gratuitas de las cuentas de Supabase y Grafana",
+
+    "business": "Empresarial",
+    "businessPrice": "60$",
+    "businessPeriod": "/mes",
+    "businessDesc": "Contáctanos si necesitas más dashboards o espacio - incluye soporte profesional del equipo",
+
+    "requestQuote": "Solicitar Cotización Personalizada",
+    "requestDemo": "Solicitar Demo",
+    "selectPlan": "Contáctanos",
+    "contactUs": "Contáctanos",
+    "watchDemo": "Ver Demo",
+
+    "readyToStart": "¿Listo para Transformar Tus Datos?",
+    "readyToStartDesc": "Hablemos sobre los requisitos de tu proyecto y creemos una solución personalizada que se adapte perfectamente a tus necesidades.",
     "features": {
-      "dataSources3": "Hasta 3 fuentes de datos",
-      "dashboards5": "5 dashboards personalizados",
-      "basicVisualizations": "Visualizaciones básicas",
-      "emailSupport": "Soporte por email",
-      "monthlyRefresh": "Actualización mensual de datos",
-      "standardTemplates": "Plantillas estándar",
-      "dataSources10": "Hasta 10 fuentes de datos",
-      "unlimitedDashboards": "Dashboards ilimitados",
-      "advancedVisualizations": "Visualizaciones avanzadas",
-      "prioritySupport": "Soporte prioritario",
-      "realtimeRefresh": "Actualización de datos en tiempo real",
-      "customTemplates": "Plantillas personalizadas",
-      "apiAccess": "Acceso a API",
-      "teamCollaboration": "Colaboración en equipo",
-      "unlimitedDataSources": "Fuentes de datos ilimitadas",
-      "customIntegrations": "Integraciones personalizadas",
-      "advancedAnalytics": "Analítica avanzada",
-      "dedicatedSupport": "Soporte dedicado",
-      "onPremiseDeployment": "Implementación local",
-      "customDevelopment": "Desarrollo personalizado",
-      "trainingConsulting": "Capacitación y consultoría",
-      "slaGuarantee": "Garantía SLA"
+      "customDashboards": "Diseño y desarrollo de dashboard personalizado",
+      "dataMapping": "Mapeo e integración completa de datos",
+      "visualizationSetup": "Configuración profesional de visualización",
+      "initialTraining": "Capacitación inicial y documentación",
+      "dedicatedDatabase": "Instancia dedicada de base de datos Supabase",
+
+      "upTo10Dashboards": "Hasta 10 dashboards (módulos)",
+      "dataStorage500MB": "Hasta 500 MB de datos simultáneamente",
+      "fileStorage1GB": "Hasta 1 GB de almacenamiento de archivos",
+      "minorUpdates": "Incluye actualizaciones menores de dashboards o fuentes de datos por un miembro del equipo riqo",
+
+      "professionalSupport": "Soporte profesional del equipo",
+      "newDashboards5": "Hasta 5 nuevos dashboards cada mes",
+      "contactForMore": "Contáctanos si necesitas más dashboards o espacio"
     }
   },
   "about": {
@@ -108,7 +117,7 @@
     "email": "Email",
     "phone": "Teléfono",
     "office": "Oficina",
-    "remoteFirst": "Remoto primero, Alcance global",
+    "remoteFirst": "Remoto Primero, Cochabamba, Bolivia",
     "sendMessage": "Envíanos un mensaje",
     "formDesc": "Completa el formulario a continuación y te responderemos dentro de 24 horas.",
     "name": "Nombre",
@@ -126,7 +135,7 @@
     "company": "Empresa",
     "privacyPolicy": "Política de Privacidad",
     "termsOfService": "Términos de Servicio",
-    "allRightsReserved": "© 2024 Riqo Agency. Todos los derechos reservados."
+    "allRightsReserved": "© 2025 Riqo Agency. Todos los derechos reservados."
   },
   "auth": {
     "welcomeBack": "Bienvenido de vuelta",
@@ -183,5 +192,28 @@
     "step2Desc": "Procesaremos tus datos y validaremos el formato para una visualización óptima.",
     "step3": "Ver Dashboards",
     "step3Desc": "Accede a tus dashboards y visualizaciones actualizados en tiempo real."
+  },
+  "demoRequest": {
+    "title": "Solicitar una Demo",
+    "subtitle": "Ve cómo Riqo puede transformar tus datos en insights accionables",
+    "name": "Nombre Completo",
+    "email": "Dirección de Email",
+    "company": "Empresa",
+    "phone": "Número de Teléfono",
+    "projectDescription": "Descripción del Proyecto",
+    "dataTypes": "Tipos de Datos",
+    "timeline": "Cronograma Deseado",
+    "namePlaceholder": "Ingresa tu nombre completo",
+    "emailPlaceholder": "Ingresa tu dirección de email",
+    "companyPlaceholder": "Ingresa el nombre de tu empresa",
+    "phonePlaceholder": "Ingresa tu número de teléfono",
+    "projectDescriptionPlaceholder": "Describe tus necesidades y objetivos de visualización de datos...",
+    "dataTypesPlaceholder": "ej., Datos de ventas, Analítica de clientes, Reportes financieros...",
+    "timelinePlaceholder": "ej., 2-3 meses, Lo antes posible, Q2 2025...",
+    "submitRequest": "Enviar Solicitud de Demo",
+    "submitting": "Enviando...",
+    "cancel": "Cancelar",
+    "successTitle": "¡Solicitud de Demo Enviada!",
+    "successMessage": "Te contactaremos dentro de 24 horas para programar tu demo personalizada."
   }
 }
