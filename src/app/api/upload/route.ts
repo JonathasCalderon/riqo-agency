@@ -209,7 +209,7 @@ async function processFileAsync(file: File, profile: any, uploadId: string, supa
 
     // Insert new data
     console.log('Inserting new data...')
-    const insertResult = await ClientDatabaseManager.insertData(profile, parseResult.data)
+    const insertResult = await ClientDatabaseManager.insertData(profile, parseResult.data as Record<string, any>[])
     if (!insertResult.success) {
       throw new Error(`Failed to insert data: ${insertResult.error}`)
     }

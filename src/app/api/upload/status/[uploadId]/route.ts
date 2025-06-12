@@ -3,7 +3,7 @@ import { NextRequest, NextResponse } from 'next/server'
 
 export async function GET(
   request: NextRequest,
-  { params }: { params: { uploadId: string } }
+  { params }: { params: Promise<{ uploadId: string }> }
 ) {
   try {
     const supabase = await createClient()
@@ -18,7 +18,7 @@ export async function GET(
       )
     }
 
-    const { uploadId } = params
+    const { uploadId } = await params
 
     // Get upload status from data_uploads table
     const { data: upload, error: uploadError } = await supabase

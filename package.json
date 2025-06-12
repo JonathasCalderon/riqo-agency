@@ -6,7 +6,9 @@
     "dev": "next dev --turbopack",
     "build": "next build",
     "start": "next start",
-    "lint": "next lint"
+    "lint": "next lint",
+    "build:analyze": "ANALYZE=true npm run build",
+    "preview": "npm run build && npm run start"
   },
   "dependencies": {
     "@supabase/ssr": "^0.6.1",

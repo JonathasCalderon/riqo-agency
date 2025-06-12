@@ -4,10 +4,10 @@ import { NextRequest, NextResponse } from 'next/server'
 export async function POST(request: NextRequest) {
   try {
     const supabase = await createClient()
-    
+
     // Check if user is authenticated and is admin
     const { data: { user }, error: authError } = await supabase.auth.getUser()
-    
+
     if (authError || !user) {
       return NextResponse.json(
         { error: 'Unauthorized' },
@@ -40,7 +40,8 @@ export async function POST(request: NextRequest) {
     }
 
     // Get user by email using service role
-    const { data: targetUser, error: userError } = await supabase.auth.admin.getUserByEmail(email)
+    const { data: users, error: userError } = await supabase.auth.admin.listUsers()
+    const targetUser = users?.users?.find(user => user.email === email)
 
     if (userError || !targetUser) {
       return NextResponse.json(
@@ -51,9 +52,9 @@ export async function POST(request: NextRequest) {
 
     return NextResponse.json({
       user: {
-        id: targetUser.user.id,
-        email: targetUser.user.email,
-        created_at: targetUser.user.created_at
+        id: targetUser.id,
+        email: targetUser.email,
+        created_at: targetUser.created_at
       }
     })
 
