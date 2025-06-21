@@ -7,6 +7,7 @@ import { tmpdir } from 'os'
 import { spawn } from 'child_process'
 import { readFile } from 'fs/promises'
 import Papa from 'papaparse'
+import { getFileContentWithProperEncoding, validateCsvContent, logEncodingStats } from '@/lib/encoding-utils'
 
 /**
  * Get a safe temporary directory path for the upload
@@ -159,17 +160,28 @@ async function processFileAsync(file: File, profile: any, uploadId: string, supa
     // Create temporary directory using helper function
     const tempDir = await ensureTempDir(uploadId)
 
-    // Save uploaded file
-    const buffer = Buffer.from(await file.arrayBuffer())
+    // Read file with proper UTF-8 encoding handling
+    const fileContent = await getFileContentWithProperEncoding(file)
+
+    // Log encoding statistics for debugging
+    logEncodingStats(fileContent, file.name)
+
+    // Validate CSV content
+    const validation = validateCsvContent(fileContent)
+    if (!validation.isValid) {
+      throw new Error(`Invalid CSV file: ${validation.error}`)
+    }
+
+    // Save the file with UTF-8 encoding
     const inputPath = join(tempDir, file.name)
     try {
-      await writeFile(inputPath, buffer)
-      console.log(`Successfully saved file to: ${inputPath} (${buffer.length} bytes)`)
+      await writeFile(inputPath, fileContent, 'utf-8')
+      console.log(`Successfully saved file to: ${inputPath} (${fileContent.length} characters, UTF-8 encoded)`)
     } catch (error) {
       console.error('Error writing file:', error)
       console.error('Temp directory:', tempDir)
       console.error('Input path:', inputPath)
-      console.error('Buffer length:', buffer.length)
+      console.error('Content length:', fileContent.length)
       throw new Error(`Failed to save uploaded file: ${error instanceof Error ? error.message : 'Unknown error'}`)
     }
 
@@ -185,8 +197,14 @@ async function processFileAsync(file: File, profile: any, uploadId: string, supa
     // Use the original CSV file (we'll add Python processing later)
     const processedPath = csvPath
 
-    // Parse processed CSV
+    // Parse processed CSV (file was already saved with UTF-8 encoding)
     const csvContent = await readFile(processedPath, 'utf-8')
+    console.log(`Reading CSV file for parsing: ${csvContent.length} characters`)
+
+    // Log a sample of the content to verify encoding
+    const sampleLines = csvContent.split('\n').slice(0, 3)
+    console.log('Sample CSV content after file read:', sampleLines)
+
     const parseResult = Papa.parse(csvContent, {
       header: true,
       skipEmptyLines: true,
@@ -203,6 +221,11 @@ async function processFileAsync(file: File, profile: any, uploadId: string, supa
         return value.trim()
       }
     })
+
+    // Log sample parsed data to verify encoding is preserved
+    if (parseResult.data.length > 0) {
+      console.log('Sample parsed data (first row):', JSON.stringify(parseResult.data[0], null, 2))
+    }
 
     if (parseResult.errors.length > 0) {
       console.warn('CSV parsing warnings:', parseResult.errors)

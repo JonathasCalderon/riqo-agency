@@ -1,11 +1,12 @@
 import { NextRequest, NextResponse } from 'next/server'
 import Papa from 'papaparse'
+import { getFileContentWithProperEncoding, logEncodingStats } from '@/lib/encoding-utils'
 
 export async function POST(request: NextRequest) {
   try {
     const formData = await request.formData()
     const file = formData.get('file') as File
-    
+
     if (!file) {
       return NextResponse.json(
         { error: 'No file provided' },
@@ -13,8 +14,12 @@ export async function POST(request: NextRequest) {
       )
     }
 
-    // Read and parse CSV
-    const fileContent = await file.text()
+    // Read and parse CSV with proper UTF-8 encoding handling
+    const fileContent = await getFileContentWithProperEncoding(file)
+
+    // Log encoding statistics for debugging
+    logEncodingStats(fileContent, file.name)
+
     const parseResult = Papa.parse(fileContent, {
       header: true,
       skipEmptyLines: true,
