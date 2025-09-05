@@ -15,6 +15,9 @@ export default function DashboardPage() {
   const [loading, setLoading] = useState(true)
   const [file, setFile] = useState<File | null>(null)
   const [uploading, setUploading] = useState(false)
+  const [uploadStatus, setUploadStatus] = useState<string>('')
+  const [uploadError, setUploadError] = useState<string>('')
+  const [uploadSuccess, setUploadSuccess] = useState<boolean>(false)
   const router = useRouter()
   const supabase = createClient()
 
@@ -42,18 +45,121 @@ export default function DashboardPage() {
     if (!file) return
 
     setUploading(true)
+    setUploadError('')
+    setUploadSuccess(false)
+    setUploadStatus('Uploading file...')
+
     try {
-      // Here you would implement the actual file upload logic
-      // For now, we'll just simulate the upload
-      await new Promise(resolve => setTimeout(resolve, 2000))
-      
-      // Reset form
-      setFile(null)
-      alert("File uploaded successfully! (This is a demo)")
+      const formData = new FormData()
+      formData.append('file', file)
+
+      const response = await fetch('/api/upload', {
+        method: 'POST',
+        body: formData
+      })
+
+      const result = await response.json()
+
+      if (!response.ok) {
+        throw new Error(result.error || 'Upload failed')
+      }
+
+      // Start polling for upload status
+      setUploadStatus('Processing file...')
+      await pollUploadStatus(result.uploadId)
+
     } catch (error) {
-      alert("Upload failed. Please try again.")
+      console.error('Upload error:', error)
+      setUploadError(error instanceof Error ? error.message : 'Upload failed. Please try again.')
+      setUploadStatus('')
     } finally {
       setUploading(false)
+    }
+  }
+
+  const pollUploadStatus = async (uploadId: string) => {
+    const maxAttempts = 60 // 5 minutes max
+    let attempts = 0
+
+    const poll = async (): Promise<void> => {
+      try {
+        const response = await fetch(`/api/upload/status/${uploadId}`)
+        const status = await response.json()
+
+        if (!response.ok) {
+          throw new Error(status.error || 'Failed to check upload status')
+        }
+
+        const statusMessage = getStatusMessage(status.status)
+        const detailedMessage = getDetailedStatusMessage(status)
+        setUploadStatus(detailedMessage || statusMessage)
+
+        if (status.status === 'completed') {
+          setUploadSuccess(true)
+          setUploadStatus(getDetailedStatusMessage(status))
+          setFile(null)
+          return
+        } else if (status.status === 'failed') {
+          throw new Error(getDetailedStatusMessage(status) || status.error_message || 'Upload processing failed')
+        } else if (status.status === 'processing' || status.status === 'pending') {
+          attempts++
+          if (attempts < maxAttempts) {
+            setTimeout(poll, 5000) // Poll every 5 seconds
+          } else {
+            throw new Error('Upload timeout - processing is taking too long')
+          }
+        }
+      } catch (error) {
+        setUploadError(error instanceof Error ? error.message : 'Failed to check upload status')
+        setUploadStatus('')
+      }
+    }
+
+    await poll()
+  }
+
+  const getStatusMessage = (status: string): string => {
+    switch (status) {
+      case 'pending': return '⏳ Upload queued for processing...'
+      case 'processing': return '⚙️ Processing file and updating database...'
+      case 'completed': return '✅ Upload completed successfully!'
+      case 'failed': return '❌ Upload failed'
+      default: return '🔍 Checking status...'
+    }
+  }
+
+  const getDetailedStatusMessage = (statusData: any): string => {
+    if (!statusData) return ''
+
+    const { status, rows_processed, error_message, metadata } = statusData
+
+    switch (status) {
+      case 'pending':
+        return 'Your file is in the processing queue. This usually takes a few seconds.'
+      case 'processing':
+        return 'Processing your data... This may take a few minutes for large files.'
+      case 'completed':
+        return `Successfully processed ${rows_processed || 0} rows. Your dashboards have been updated with the latest data.`
+      case 'failed':
+        if (metadata?.error_category) {
+          switch (metadata.error_category) {
+            case 'excel_processing':
+              return 'Excel file processing failed. Please ensure your Excel file is not corrupted and try again.'
+            case 'csv_parsing':
+              return 'CSV parsing failed. Please check that your file has proper headers and is correctly formatted.'
+            case 'encoding':
+              return 'File encoding issue. Please save your file with UTF-8 encoding and try again.'
+            case 'database':
+              return 'Database error occurred. Please try again or contact support if the issue persists.'
+            case 'size':
+              return 'File is too large. Please reduce the file size or split it into smaller files.'
+            default:
+              return error_message || 'An unexpected error occurred during processing.'
+          }
+        }
+        return error_message || 'Processing failed. Please try again.'
+      default:
+        return ''
     }
   }
 
@@ -115,25 +221,34 @@ export default function DashboardPage() {
               <CardHeader>
                 <CardTitle className="flex items-center">
                   <Upload className="w-5 h-5 mr-2" />
-                  Upload CSV File
+                  Upload Data File
                 </CardTitle>
                 <CardDescription>
-                  Upload your CSV file to update your dashboards and visualizations
+                  Upload your CSV or Excel file to update your dashboards and visualizations
                 </CardDescription>
               </CardHeader>
               <CardContent>
                 <form onSubmit={handleFileUpload} className="space-y-6">
                   <div>
                     <label htmlFor="file" className="block text-sm font-medium text-foreground mb-2">
-                      Select CSV File
+                      Select CSV or Excel File
                     </label>
                     <Input
                       id="file"
                       type="file"
-                      accept=".csv"
-                      onChange={(e) => setFile(e.target.files?.[0] || null)}
+                      accept=".csv,.xlsx,.xls"
+                      onChange={(e) => {
+                        setFile(e.target.files?.[0] || null)
+                        setUploadError('')
+                        setUploadSuccess(false)
+                        setUploadStatus('')
+                      }}
                       className="cursor-pointer"
+                      disabled={uploading}
                     />
+                    <p className="text-xs text-muted-foreground mt-1">
+                      Supported formats: CSV, Excel (.xlsx, .xls) - Max size: 50MB
+                    </p>
                   </div>
                   
                   {file && (
@@ -143,10 +258,40 @@ export default function DashboardPage() {
                         <div>
                           <p className="font-medium">{file.name}</p>
                           <p className="text-sm text-muted-foreground">
-                            {(file.size / 1024 / 1024).toFixed(2)} MB
+                            {(file.size / 1024 / 1024).toFixed(2)} MB • {file.type || 'Unknown type'}
                           </p>
                         </div>
                       </div>
+                    </div>
+                  )}
+
+                  {uploadStatus && (
+                    <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
+                      <div className="flex items-center space-x-3">
+                        {uploading && (
+                          <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-blue-600"></div>
+                        )}
+                        <p className="text-sm text-blue-800">{uploadStatus}</p>
+                      </div>
+                      {uploading && (
+                        <div className="mt-2 w-full bg-blue-200 rounded-full h-2">
+                          <div className="bg-blue-600 h-2 rounded-full animate-pulse" style={{width: '60%'}}></div>
+                        </div>
+                      )}
+                    </div>
+                  )}
+
+                  {uploadError && (
+                    <div className="bg-red-50 border border-red-200 rounded-lg p-4">
+                      <p className="text-sm text-red-800">{uploadError}</p>
+                    </div>
+                  )}
+
+                  {uploadSuccess && (
+                    <div className="bg-green-50 border border-green-200 rounded-lg p-4">
+                      <p className="text-sm text-green-800">
+                        🎉 File uploaded and processed successfully! Your dashboards have been updated.
+                      </p>
                     </div>
                   )}
                   

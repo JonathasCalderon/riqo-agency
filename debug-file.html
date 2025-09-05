@@ -1,0 +1,138 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Debug File Inspector</title>
+    <style>
+        body { font-family: Arial, sans-serif; max-width: 1000px; margin: 0 auto; padding: 20px; }
+        .form-group { margin-bottom: 15px; }
+        label { display: block; margin-bottom: 5px; font-weight: bold; }
+        input { width: 100%; padding: 8px; border: 1px solid #ddd; border-radius: 4px; }
+        button { background: #007bff; color: white; padding: 10px 20px; border: none; border-radius: 4px; cursor: pointer; }
+        button:hover { background: #0056b3; }
+        .result { margin-top: 20px; padding: 10px; border-radius: 4px; }
+        .success { background: #d4edda; border: 1px solid #c3e6cb; color: #155724; }
+        .error { background: #f8d7da; border: 1px solid #f5c6cb; color: #721c24; }
+        pre { background: #f8f9fa; padding: 10px; border-radius: 4px; overflow-x: auto; }
+        .analysis { display: grid; grid-template-columns: 1fr 1fr; gap: 20px; margin-top: 20px; }
+        .info-box { background: #e9ecef; padding: 15px; border-radius: 4px; }
+    </style>
+</head>
+<body>
+    <h1>File Inspector</h1>
+    
+    <p>This tool analyzes your file to determine its actual format and help debug upload issues.</p>
+
+    <form id="debugForm">
+        <div class="form-group">
+            <label for="file">Select File to Inspect:</label>
+            <input type="file" id="file" required>
+        </div>
+        <button type="submit">Inspect File</button>
+    </form>
+
+    <div id="result"></div>
+
+    <script>
+        document.getElementById('debugForm').addEventListener('submit', async (e) => {
+            e.preventDefault();
+            
+            const resultDiv = document.getElementById('result');
+            const fileInput = document.getElementById('file');
+            const file = fileInput.files[0];
+            
+            if (!file) {
+                resultDiv.innerHTML = '<div class="result error">Please select a file</div>';
+                return;
+            }
+            
+            resultDiv.innerHTML = 'Analyzing file...';
+            
+            try {
+                const formData = new FormData();
+                formData.append('file', file);
+                
+                const response = await fetch('/api/debug-file', {
+                    method: 'POST',
+                    body: formData
+                });
+                
+                const result = await response.json();
+                
+                if (response.ok) {
+                    resultDiv.innerHTML = `
+                        <div class="result success">
+                            <h3>📁 File Analysis Results</h3>
+                            
+                            <div class="analysis">
+                                <div class="info-box">
+                                    <h4>Basic Info</h4>
+                                    <p><strong>Filename:</strong> ${result.filename}</p>
+                                    <p><strong>Size:</strong> ${(result.size / 1024).toFixed(2)} KB</p>
+                                    <p><strong>MIME Type:</strong> ${result.mime_type || 'Not detected'}</p>
+                                    <p><strong>Detected Type:</strong> ${result.detected_type}</p>
+                                </div>
+                                
+                                <div class="info-box">
+                                    <h4>Technical Analysis</h4>
+                                    <p><strong>Is Excel:</strong> ${result.analysis.is_likely_excel ? '✅ Yes' : '❌ No'}</p>
+                                    <p><strong>Is CSV:</strong> ${result.analysis.is_likely_csv ? '✅ Yes' : '❌ No'}</p>
+                                    <p><strong>Is ZIP-based:</strong> ${result.analysis.is_zip_based ? '✅ Yes' : '❌ No'}</p>
+                                    <p><strong>Has UTF-8 BOM:</strong> ${result.analysis.has_utf8_bom ? '✅ Yes' : '❌ No'}</p>
+                                </div>
+                            </div>
+                            
+                            <h4>File Signature (Hex):</h4>
+                            <pre>${result.hex_signature}</pre>
+                            
+                            <h4>Text Preview:</h4>
+                            <pre>${result.text_preview}</pre>
+                            
+                            <div class="info-box" style="margin-top: 20px;">
+                                <h4>💡 Recommendations:</h4>
+                                ${getRecommendations(result)}
+                            </div>
+                        </div>
+                    `;
+                } else {
+                    throw new Error(result.error || 'Analysis failed');
+                }
+            } catch (error) {
+                resultDiv.innerHTML = `
+                    <div class="result error">
+                        <h3>❌ Analysis failed</h3>
+                        <p>${error.message}</p>
+                    </div>
+                `;
+            }
+        });
+        
+        function getRecommendations(result) {
+            let recommendations = [];
+            
+            if (result.analysis.is_likely_csv && !result.analysis.is_likely_excel) {
+                recommendations.push("This appears to be a CSV file. Try uploading it as a .csv file instead.");
+            }
+            
+            if (!result.analysis.is_zip_based && result.filename.endsWith('.xlsx')) {
+                recommendations.push("This .xlsx file doesn't have a valid ZIP signature. It may be corrupted or in a different format.");
+            }
+            
+            if (result.detected_type === 'unknown') {
+                recommendations.push("File format not recognized. Try opening the file in Excel and saving it as a new .xlsx or .csv file.");
+            }
+            
+            if (result.analysis.is_likely_excel && result.analysis.is_zip_based) {
+                recommendations.push("This appears to be a valid Excel file. The upload issue may be due to content or encoding problems.");
+            }
+            
+            if (recommendations.length === 0) {
+                recommendations.push("File appears to be in the expected format. Upload issues may be due to content or server-side processing.");
+            }
+            
+            return recommendations.map(rec => `<p>• ${rec}</p>`).join('');
+        }
+    </script>
+</body>
+</html>

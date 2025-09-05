@@ -44,28 +44,49 @@ export class ClientDatabaseManager {
   /**
    * Test connection to a user's client database
    */
-  static async testConnection(profile: Profile): Promise<{ success: boolean; error?: string }> {
+  static async testConnection(profile: Profile): Promise<{ success: boolean; error?: string; tableInfo?: any }> {
     try {
       if (!profile.client_database_url) {
         return { success: false, error: 'No client database configured' }
       }
+
+      console.log('Testing connection to client database:')
+      console.log('- URL:', profile.client_database_url)
+      console.log('- Table:', profile.data_table_name || 'client_data')
+      console.log('- Has service key:', !!profile.client_database_service_key)
 
       const supabase = this.getClientConnection(profile, true) // Use service key for testing
 
       // Try a simple query to test the connection
       // We'll try to query the actual table that should exist
       const tableName = profile.data_table_name || 'client_data'
-      const { error } = await supabase
+
+      // First, try to get table structure
+      const { data: tableData, error: tableError } = await supabase
         .from(tableName)
         .select('*')
         .limit(1)
 
-      if (error) {
-        return { success: false, error: `Cannot access table '${tableName}': ${error.message}` }
+      if (tableError) {
+        console.error('Table access error:', tableError)
+        return {
+          success: false,
+          error: `Cannot access table '${tableName}': ${tableError.message}. Details: ${JSON.stringify(tableError)}`
+        }
       }
 
-      return { success: true }
+      console.log('Table access successful. Sample data structure:', tableData?.[0] ? Object.keys(tableData[0]) : 'No data in table')
+
+      return {
+        success: true,
+        tableInfo: {
+          tableName,
+          sampleColumns: tableData?.[0] ? Object.keys(tableData[0]) : [],
+          hasData: tableData && tableData.length > 0
+        }
+      }
     } catch (error) {
+      console.error('Connection test error:', error)
       return {
         success: false,
         error: error instanceof Error ? error.message : 'Unknown error'
@@ -134,6 +155,114 @@ export class ClientDatabaseManager {
   }
 
   /**
+   * Insert data in chunks for large datasets
+   */
+  static async insertDataInChunks(
+    profile: Profile,
+    data: Record<string, any>[],
+    chunkSize: number = 1000
+  ): Promise<{ success: boolean; error?: string; rowsInserted?: number }> {
+    try {
+      const supabase = this.getClientConnection(profile, true) // Use service key for inserts
+      const tableName = profile.data_table_name || 'ventas'
+
+      if (!data || data.length === 0) {
+        return { success: true, rowsInserted: 0 }
+      }
+
+      console.log(`Inserting ${data.length} rows in chunks of ${chunkSize} into table: ${tableName}`)
+
+      let totalInserted = 0
+      const chunks = []
+
+      // Split data into chunks
+      for (let i = 0; i < data.length; i += chunkSize) {
+        chunks.push(data.slice(i, i + chunkSize))
+      }
+
+      console.log(`Created ${chunks.length} chunks for insertion`)
+
+      // Process each chunk
+      for (let i = 0; i < chunks.length; i++) {
+        const chunk = chunks[i]
+        console.log(`Processing chunk ${i + 1}/${chunks.length} (${chunk.length} rows)`)
+
+        // Process data to format dates if needed
+        const processedChunk = chunk.map(row => {
+          const processedRow = { ...row }
+
+          // If there's a 'fecha' field, also create 'fecha_formateada'
+          if (row.fecha) {
+            processedRow.fecha_formateada = this.formatDateForGrafana(row.fecha)
+          }
+
+          return processedRow
+        })
+
+        // Insert chunk
+        const { error, count } = await supabase
+          .from(tableName)
+          .insert(processedChunk)
+          .select('id', { count: 'exact' })
+
+        if (error) {
+          console.error(`Insert error in chunk ${i + 1}:`, error)
+          return {
+            success: false,
+            error: `Failed to insert chunk ${i + 1}/${chunks.length} into table '${tableName}': ${error.message}`
+          }
+        }
+
+        totalInserted += count || 0
+        console.log(`Chunk ${i + 1}/${chunks.length} inserted successfully: ${count} rows`)
+
+        // Add a small delay between chunks to avoid overwhelming the database
+        if (i < chunks.length - 1) {
+          await new Promise(resolve => setTimeout(resolve, 100))
+        }
+      }
+
+      console.log(`Successfully inserted all ${totalInserted} rows into table: ${tableName}`)
+      return { success: true, rowsInserted: totalInserted }
+
+    } catch (error) {
+      return {
+        success: false,
+        error: error instanceof Error ? error.message : 'Unknown error'
+      }
+    }
+  }
+
+  /**
+   * Get table structure information for debugging
+   */
+  static async getTableStructure(profile: Profile): Promise<{ success: boolean; columns?: string[]; error?: string }> {
+    try {
+      const supabase = this.getClientConnection(profile, true)
+      const tableName = profile.data_table_name || 'ventas'
+
+      // Try to get table structure by querying with limit 0
+      const { data, error } = await supabase
+        .from(tableName)
+        .select('*')
+        .limit(0)
+
+      if (error) {
+        return { success: false, error: error.message }
+      }
+
+      // Get column names from the query metadata
+      // Since we're limiting to 0 rows, we won't get data but we can infer structure
+      return { success: true, columns: [] }
+    } catch (error) {
+      return {
+        success: false,
+        error: error instanceof Error ? error.message : 'Unknown error'
+      }
+    }
+  }
+
+  /**
    * Insert data and format dates (your exact workflow)
    */
   static async insertData(
@@ -150,6 +279,7 @@ export class ClientDatabaseManager {
 
       console.log(`Inserting ${data.length} rows into table: ${tableName}`)
       console.log('CSV columns:', Object.keys(data[0] || {}))
+      console.log('Client database URL:', profile.client_database_url)
 
       // Process data to format dates if needed
       const processedData = data.map(row => {
@@ -158,11 +288,12 @@ export class ClientDatabaseManager {
         // If there's a 'fecha' field, also create 'fecha_formateada'
         if (row.fecha) {
           processedRow.fecha_formateada = this.formatDateForGrafana(row.fecha)
-          console.log(`Formatted date: ${row.fecha} → ${processedRow.fecha_formateada}`)
         }
 
         return processedRow
       })
+
+      console.log('Sample processed data:', JSON.stringify(processedData[0], null, 2))
 
       // Insert data directly - only the columns that exist in CSV
       // Supabase will handle missing columns by setting them to NULL or default values
@@ -173,10 +304,26 @@ export class ClientDatabaseManager {
 
       if (error) {
         console.error('Insert error details:', error)
+        console.error('Error code:', error.code)
+        console.error('Error hint:', error.hint)
+        console.error('Error details:', error.details)
         console.error('Sample data being inserted:', JSON.stringify(processedData[0], null, 2))
+
+        // Provide more specific error messages based on error type
+        let userFriendlyError = error.message
+        if (error.code === '42P01') {
+          userFriendlyError = `Table '${tableName}' does not exist in the client database. Please contact support to set up your data table.`
+        } else if (error.code === '42703') {
+          userFriendlyError = `Column mismatch: Some columns in your CSV file don't exist in the database table. Expected columns may differ from your CSV headers.`
+        } else if (error.code === '23505') {
+          userFriendlyError = `Duplicate data detected. The table may already contain some of this data.`
+        } else if (error.message.includes('permission')) {
+          userFriendlyError = `Permission denied: Unable to insert data into the client database. Please contact support to check your database permissions.`
+        }
+
         return {
           success: false,
-          error: `Failed to insert data into table '${tableName}': ${error.message}. CSV columns: ${Object.keys(data[0] || {}).join(', ')}`
+          error: `${userFriendlyError} (Technical details: ${error.message})`
         }
       }
 
