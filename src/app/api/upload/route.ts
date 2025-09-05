@@ -6,7 +6,7 @@ import { join } from 'path'
 import { tmpdir } from 'os'
 import { spawn } from 'child_process'
 import { readFile } from 'fs/promises'
-import Papa from 'papaparse'
+import Papa, { ParseError } from 'papaparse'
 import { getFileContentWithProperEncoding, validateCsvContent, logEncodingStats } from '@/lib/encoding-utils'
 
 /**
@@ -277,11 +277,11 @@ async function processFileAsync(file: File, profile: any, uploadId: string, supa
       console.warn('CSV parsing warnings:', parseResult.errors)
 
       // Categorize errors
-      const fatalErrors = parseResult.errors.filter(e => e.type === 'Delimiter' || e.type === 'Quotes')
-      const warningErrors = parseResult.errors.filter(e => e.type !== 'Delimiter' && e.type !== 'Quotes')
+      const fatalErrors = parseResult.errors.filter((e: ParseError) => e.type === 'Delimiter' || e.type === 'Quotes')
+      const warningErrors = parseResult.errors.filter((e: ParseError) => e.type !== 'Delimiter' && e.type !== 'Quotes')
 
       if (fatalErrors.length > 0) {
-        const errorDetails = fatalErrors.map(e => `Line ${e.row || 'unknown'}: ${e.message}`).join('; ')
+        const errorDetails = fatalErrors.map((e: ParseError) => `Line ${e.row || 'unknown'}: ${e.message}`).join('; ')
         throw new Error(`CSV format errors detected: ${errorDetails}. Please check your file format and try again.`)
       }
 
