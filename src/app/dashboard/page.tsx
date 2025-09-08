@@ -11,6 +11,7 @@ import Image from "next/image"
 import Link from "next/link"
 
 export default function DashboardPage() {
+  // VERSION: BLOB-UPLOAD-v3.0 - Force cache invalidation
   const [user, setUser] = useState<any>(null)
   const [loading, setLoading] = useState(true)
   const [file, setFile] = useState<File | null>(null)
@@ -53,18 +54,25 @@ export default function DashboardPage() {
       const formData = new FormData()
       formData.append('file', file)
 
-      // Use blob upload for large files - FORCE CACHE BUST v2
-      const uploadUrl = '/api/upload-blob'
-      console.log('🚀 UPLOADING TO BLOB ENDPOINT:', uploadUrl)
-      console.log('🔍 Current timestamp:', new Date().toISOString())
+      // FORCE CACHE BUST v3 - BLOB UPLOAD ONLY
+      const timestamp = Date.now()
+      const uploadUrl = `/api/upload-blob?v=${timestamp}`
+      console.log('🚀🚀🚀 UPLOADING TO BLOB ENDPOINT:', uploadUrl)
+      console.log('🔍 Cache bust timestamp:', timestamp)
+      console.log('🌐 User agent:', navigator.userAgent)
+
+      // Add a visible alert to confirm we're using the right endpoint
+      console.warn('USING BLOB ENDPOINT - CHECK NETWORK TAB FOR /api/upload-blob')
 
       const response = await fetch(uploadUrl, {
         method: 'POST',
         body: formData,
-        cache: 'no-cache', // Prevent caching issues
+        cache: 'no-cache',
         headers: {
           'Cache-Control': 'no-cache, no-store, must-revalidate',
-          'Pragma': 'no-cache'
+          'Pragma': 'no-cache',
+          'Expires': '0',
+          'X-Cache-Bust': timestamp.toString()
         }
       })
 

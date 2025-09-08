@@ -11,6 +11,10 @@ const nextConfig: NextConfig = {
   experimental: {
     optimizePackageImports: ['lucide-react'],
   },
+  // Force cache invalidation
+  generateBuildId: async () => {
+    return `blob-upload-v3-${Date.now()}`
+  },
 };
 
 export default withNextIntl(nextConfig);
