@@ -158,13 +158,14 @@ export async function POST(request: NextRequest) {
   }
 }
 
-// Copy the processing function from blob route
+/**
+ * Process file from Vercel Blob storage - COMPLETE VERSION
+ */
 async function processFileFromBlob(blobUrl: string, profile: any, uploadId: string, supabase: any) {
-  // [This would be the same function as in the blob route - truncated for brevity]
-  // For now, just log that processing started
-  console.log(`Processing started for upload ${uploadId} from blob ${blobUrl}`)
-
   try {
+    console.log(`Starting blob file processing for upload ${uploadId}`)
+    console.log(`Blob URL: ${blobUrl}`)
+
     // Update status to processing
     await supabase
       .from('data_uploads')
@@ -174,40 +175,143 @@ async function processFileFromBlob(blobUrl: string, profile: any, uploadId: stri
       })
       .eq('id', uploadId)
 
-    // Fetch and process file (simplified version)
+    // Fetch file content from blob
     const response = await fetch(blobUrl)
+    if (!response.ok) {
+      throw new Error(`Failed to fetch file from blob: ${response.statusText}`)
+    }
+
     const fileBuffer = await response.arrayBuffer()
     const fileContent = new TextDecoder('utf-8').decode(fileBuffer)
 
-    // Basic CSV parsing
+    console.log(`File content loaded: ${fileContent.length} characters`)
+
+    // Validate CSV content
+    const validation = validateCsvContent(fileContent)
+    if (!validation.isValid) {
+      throw new Error(`Invalid CSV file: ${validation.error}`)
+    }
+
+    // Check file size and use appropriate parsing strategy
+    const fileSizeInMB = fileContent.length / (1024 * 1024)
+    console.log(`CSV file size: ${fileSizeInMB.toFixed(2)} MB`)
+
+    // Parse CSV with advanced processing
     const parseResult = Papa.parse(fileContent, {
       header: true,
       skipEmptyLines: true,
       transformHeader: (header) => header.trim(),
-      transform: (value) => {
-        if (value === null || value === undefined || value === '') return null
-        if (!isNaN(Number(value)) && value.trim() !== '') return Number(value)
+      transform: (value, field) => {
+        if (value === null || value === undefined || value === '') {
+          return null
+        }
+
+        // Handle date fields specifically
+        if (field && typeof field === 'string' && (field.toLowerCase().includes('fecha') || field.toLowerCase().includes('date'))) {
+          if (typeof value === 'string' && isDateLike(value)) {
+            return normalizeDate(value)
+          }
+        }
+
+        // Handle numeric fields
+        if (typeof value === 'string' && isNumericLike(value)) {
+          return cleanNumericValue(value)
+        }
+
+        // Try to convert numbers
+        if (!isNaN(Number(value)) && value.trim() !== '') {
+          return Number(value)
+        }
+
         return value.trim()
       }
     })
 
-    // Test database connection and insert data
+    if (parseResult.errors.length > 0) {
+      console.warn('CSV parsing warnings:', parseResult.errors)
+      const fatalErrors = parseResult.errors.filter((e: ParseError) => e.type === 'Delimiter' || e.type === 'Quotes')
+      if (fatalErrors.length > 0) {
+        const errorDetails = fatalErrors.map((e: ParseError) => `Line ${e.row || 'unknown'}: ${e.message}`).join('; ')
+        throw new Error(`CSV format errors detected: ${errorDetails}. Please check your file format and try again.`)
+      }
+    }
+
+    console.log(`Processing ${parseResult.data.length} rows for upload ${uploadId}`)
+
+    // Log CSV columns vs expected table structure
+    const csvColumns = parseResult.meta?.fields || []
+    console.log('CSV columns detected:', csvColumns)
+
+    // Identify date columns for processing
+    const dateColumns = csvColumns.filter((col: string) =>
+      col.toLowerCase().includes('fecha') || col.toLowerCase().includes('date')
+    )
+    console.log('Date columns identified for normalization:', dateColumns)
+
+    // Test database connection
+    console.log('Testing client database connection...')
     const connectionTest = await ClientDatabaseManager.testConnection(profile)
     if (!connectionTest.success) {
-      throw new Error(`Database connection failed: ${connectionTest.error}`)
+      throw new Error(`Client database connection failed: ${connectionTest.error}`)
     }
+    console.log('Client database connection successful')
 
+    // Truncate existing data
+    console.log('Truncating existing data...')
     const truncateResult = await ClientDatabaseManager.truncateDataTable(profile)
     if (!truncateResult.success) {
-      throw new Error(`Failed to truncate data: ${truncateResult.error}`)
+      throw new Error(`Failed to truncate data table: ${truncateResult.error}`)
     }
+    console.log('Data truncated successfully')
 
-    const dataToInsert = parseResult.data as Record<string, any>[]
-    const insertResult = await ClientDatabaseManager.insertDataInChunks(profile, dataToInsert, 1000)
+    // Post-process data to ensure all normalization is applied
+    console.log('Post-processing data for normalization...')
+    let dataToInsert = parseResult.data as Record<string, any>[]
+
+    // Apply additional data normalization
+    dataToInsert = dataToInsert.map((row: Record<string, any>) => {
+      const normalizedRow: Record<string, any> = {}
+
+      for (const [key, value] of Object.entries(row)) {
+        let normalizedValue = value
+
+        // Additional date normalization for any missed date fields
+        if (typeof value === 'string' && (key.toLowerCase().includes('fecha') || key.toLowerCase().includes('date'))) {
+          if (isDateLike(value)) {
+            normalizedValue = normalizeDate(value)
+          }
+        }
+        // Additional numeric normalization
+        else if (typeof value === 'string' && isNumericLike(value)) {
+          normalizedValue = cleanNumericValue(value)
+        }
+
+        normalizedRow[key] = normalizedValue
+      }
+
+      return normalizedRow
+    })
+
+    // Insert new data with chunking for large datasets
+    console.log('Inserting new data...')
+    console.log(`Sample normalized row:`, JSON.stringify(dataToInsert[0] || {}, null, 2))
+
+    let insertResult: { success: boolean; error?: string; rowsInserted?: number }
+
+    if (dataToInsert.length > 5000) {
+      // For large datasets, insert in chunks to avoid memory issues
+      console.log(`Large dataset detected (${dataToInsert.length} rows), inserting in chunks...`)
+      insertResult = await ClientDatabaseManager.insertDataInChunks(profile, dataToInsert, 1000)
+    } else {
+      // For smaller datasets, use regular insertion
+      insertResult = await ClientDatabaseManager.insertData(profile, dataToInsert)
+    }
 
     if (!insertResult.success) {
       throw new Error(`Failed to insert data: ${insertResult.error}`)
     }
+
+    console.log(`Data inserted successfully: ${insertResult.rowsInserted} rows`)
 
     // Update upload record with success
     await supabase
@@ -218,24 +322,93 @@ async function processFileFromBlob(blobUrl: string, profile: any, uploadId: stri
         row_count: insertResult.rowsInserted || 0,
         column_count: parseResult.meta?.fields?.length || 0,
         columns_info: parseResult.meta?.fields || [],
-        client_database_synced: true
+        client_database_synced: true,
+        metadata: {
+          file_size_mb: fileSizeInMB,
+          processing_time: new Date().toISOString(),
+          date_columns: dateColumns,
+          total_columns: csvColumns.length
+        }
       })
       .eq('id', uploadId)
 
-    console.log(`Successfully processed ${insertResult.rowsInserted} rows`)
+    console.log(`Upload ${uploadId} completed successfully`)
 
   } catch (error) {
-    console.error(`Error processing upload ${uploadId}:`, error)
+    console.error(`Error processing blob upload ${uploadId}:`, error)
 
+    // Categorize error types for better user feedback
+    let userFriendlyError = 'An unexpected error occurred while processing your file.'
+    let errorCategory = 'unknown'
+
+    if (error instanceof Error) {
+      const errorMessage = error.message.toLowerCase()
+
+      if (errorMessage.includes('csv') || errorMessage.includes('parsing')) {
+        userFriendlyError = 'Failed to parse CSV file. Please check the file format and ensure it has proper headers.'
+        errorCategory = 'csv_parsing'
+      } else if (errorMessage.includes('database') || errorMessage.includes('insert')) {
+        userFriendlyError = 'Database error occurred while saving your data. Please try again or contact support.'
+        errorCategory = 'database'
+      } else if (errorMessage.includes('connection')) {
+        userFriendlyError = 'Database connection failed. Please check your configuration or contact support.'
+        errorCategory = 'connection'
+      } else {
+        userFriendlyError = error.message
+      }
+    }
+
+    // Update upload record with detailed error information
     await supabase
       .from('data_uploads')
       .update({
         processing_status: 'failed',
         processing_completed_at: new Date().toISOString(),
-        processing_error: error instanceof Error ? error.message : 'Unknown error'
+        processing_error: userFriendlyError,
+        sync_error_message: error instanceof Error ? error.message : 'Unknown error',
+        metadata: {
+          error_category: errorCategory,
+          original_error: error instanceof Error ? error.message : 'Unknown error',
+          timestamp: new Date().toISOString()
+        }
       })
       .eq('id', uploadId)
   }
+}
+
+// Helper functions for CSV processing
+function isDateLike(value: string): boolean {
+  const datePatterns = [
+    /^\d{4}-\d{2}-\d{2}/, // YYYY-MM-DD
+    /^\d{2}\/\d{2}\/\d{4}/, // DD/MM/YYYY or MM/DD/YYYY
+    /^\d{2}-\d{2}-\d{4}/, // DD-MM-YYYY
+    /^\d{1,2}\/\d{1,2}\/\d{2,4}/ // D/M/YY
+  ]
+  return datePatterns.some(pattern => pattern.test(value))
+}
+
+function normalizeDate(value: string): string {
+  try {
+    const date = new Date(value)
+    if (!isNaN(date.getTime())) {
+      return date.toISOString().split('T')[0] // Return YYYY-MM-DD format
+    }
+  } catch (e) {
+    // If date parsing fails, return original value
+  }
+  return value
+}
+
+function isNumericLike(value: string): boolean {
+  const numericPattern = /^[\$\€\£]?[\d,]+\.?\d*$/
+  return numericPattern.test(value.trim())
+}
+
+function cleanNumericValue(value: string): string {
+  // Remove currency symbols and commas, keep the number
+  const cleaned = value.replace(/[\$\€\£,]/g, '').trim()
+  const num = parseFloat(cleaned)
+  return isNaN(num) ? value : num.toString()
 }
 
 export async function GET() {
