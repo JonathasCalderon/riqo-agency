@@ -1,14 +1,8 @@
 {
   "functions": {
-    "src/app/api/upload/route.ts": {
-      "maxDuration": 60
-    },
     "src/app/api/upload-blob/route.ts": {
       "maxDuration": 60,
       "memory": 1024
-    },
-    "src/app/api/upload/status/[uploadId]/route.ts": {
-      "maxDuration": 10
     },
     "src/app/api/upload-blob/status/[uploadId]/route.ts": {
       "maxDuration": 10

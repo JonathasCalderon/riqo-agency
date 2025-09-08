@@ -53,14 +53,19 @@ export default function DashboardPage() {
       const formData = new FormData()
       formData.append('file', file)
 
-      // Use blob upload for large files
+      // Use blob upload for large files - FORCE CACHE BUST v2
       const uploadUrl = '/api/upload-blob'
-      console.log('Uploading to:', uploadUrl)
+      console.log('🚀 UPLOADING TO BLOB ENDPOINT:', uploadUrl)
+      console.log('🔍 Current timestamp:', new Date().toISOString())
 
       const response = await fetch(uploadUrl, {
         method: 'POST',
         body: formData,
-        cache: 'no-cache' // Prevent caching issues
+        cache: 'no-cache', // Prevent caching issues
+        headers: {
+          'Cache-Control': 'no-cache, no-store, must-revalidate',
+          'Pragma': 'no-cache'
+        }
       })
 
       // Check if response is JSON
