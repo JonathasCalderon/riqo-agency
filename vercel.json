@@ -10,6 +10,10 @@
     },
     "src/app/api/upload-blob/status/[uploadId]/route.ts": {
       "maxDuration": 10
+    },
+    "src/app/api/test-upload/route.ts": {
+      "maxDuration": 60,
+      "memory": 1024
     }
   },
   "regions": ["iad1"],

@@ -41,6 +41,22 @@ export default function DashboardPage() {
     router.push("/")
   }
 
+  const testAPI = async () => {
+    console.log('🧪 Testing API connectivity...')
+    try {
+      const response = await fetch('/api/test-upload', {
+        method: 'GET',
+        cache: 'no-cache'
+      })
+      const result = await response.json()
+      console.log('✅ API Test Result:', result)
+      alert(`API Test: ${response.ok ? 'SUCCESS' : 'FAILED'}\n${JSON.stringify(result, null, 2)}`)
+    } catch (error) {
+      console.error('❌ API Test Failed:', error)
+      alert(`API Test FAILED: ${error}`)
+    }
+  }
+
   const handleFileUpload = async (e: React.FormEvent) => {
     e.preventDefault()
     if (!file) return
@@ -54,10 +70,10 @@ export default function DashboardPage() {
       const formData = new FormData()
       formData.append('file', file)
 
-      // FORCE CACHE BUST v3 - BLOB UPLOAD ONLY
+      // USE THE WORKING UPLOAD ENDPOINT (not blob)
       const timestamp = Date.now()
-      const uploadUrl = `/api/upload-blob?v=${timestamp}`
-      console.log('🚀🚀🚀 UPLOADING TO BLOB ENDPOINT:', uploadUrl)
+      const uploadUrl = `/api/upload?v=${timestamp}`
+      console.log('🚀🚀🚀 UPLOADING TO UPLOAD ENDPOINT:', uploadUrl)
       console.log('🔍 Cache bust timestamp:', timestamp)
       console.log('🌐 User agent:', navigator.userAgent)
 
@@ -321,13 +337,24 @@ export default function DashboardPage() {
                     </div>
                   )}
                   
-                  <Button 
-                    type="submit" 
-                    disabled={!file || uploading}
-                    className="w-full"
-                  >
-                    {uploading ? "Uploading..." : "Upload File"}
-                  </Button>
+                  <div className="space-y-2">
+                    <Button
+                      type="button"
+                      onClick={testAPI}
+                      variant="outline"
+                      className="w-full"
+                    >
+                      🧪 Test API Connection
+                    </Button>
+
+                    <Button
+                      type="submit"
+                      disabled={!file || uploading}
+                      className="w-full"
+                    >
+                      {uploading ? "Uploading..." : "Upload File"}
+                    </Button>
+                  </div>
                 </form>
               </CardContent>
             </Card>
