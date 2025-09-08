@@ -3,7 +3,7 @@ import { ClientDatabaseManager } from '@/lib/supabase/client-db'
 import { NextRequest, NextResponse } from 'next/server'
 import { put } from '@vercel/blob'
 import Papa, { ParseError } from 'papaparse'
-import { getFileContentWithProperEncoding, validateCsvContent, logEncodingStats } from '@/lib/encoding-utils'
+import { validateCsvContent } from '@/lib/encoding-utils'
 
 export async function POST(request: NextRequest) {
   try {
@@ -193,7 +193,7 @@ async function processFileFromBlob(blobUrl: string, profile: any, uploadId: stri
       header: true,
       skipEmptyLines: true,
       transformHeader: (header) => header.trim(),
-      transform: (value, header) => {
+      transform: (value) => {
         if (value === null || value === undefined || value === '') {
           return null
         }

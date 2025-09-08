@@ -9,6 +9,9 @@
     },
     "src/app/api/upload/status/[uploadId]/route.ts": {
       "maxDuration": 10
+    },
+    "src/app/api/upload-blob/status/[uploadId]/route.ts": {
+      "maxDuration": 10
     }
   },
   "regions": ["iad1"],

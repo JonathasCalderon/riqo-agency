@@ -96,7 +96,7 @@ export default function DashboardPage() {
 
     const poll = async (): Promise<void> => {
       try {
-        const response = await fetch(`/api/upload/status/${uploadId}`)
+        const response = await fetch(`/api/upload-blob/status/${uploadId}`)
         const status = await response.json()
 
         if (!response.ok) {
