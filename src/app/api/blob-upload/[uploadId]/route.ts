@@ -4,9 +4,10 @@ import { put } from '@vercel/blob'
 
 export async function PUT(
   request: NextRequest,
-  { params }: { params: { uploadId: string } }
+  context: { params: Promise<{ uploadId: string }> }
 ) {
   try {
+    const params = await context.params
     console.log('📤 Blob Upload Proxy called for upload:', params.uploadId)
     const supabase = await createClient()
 

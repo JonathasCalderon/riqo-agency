@@ -20,7 +20,7 @@ export async function POST(request: NextRequest) {
       )
     }
 
-    const { blobUrl, uploadId, filename } = await request.json()
+    const { blobUrl, uploadId } = await request.json()
 
     if (!blobUrl || !uploadId) {
       return NextResponse.json(
