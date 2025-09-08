@@ -53,10 +53,8 @@ export default function DashboardPage() {
       const formData = new FormData()
       formData.append('file', file)
 
-      // Use blob upload for production to handle large files
-      const uploadEndpoint = process.env.NODE_ENV === 'production' ? '/api/upload-blob' : '/api/upload'
-
-      const response = await fetch(uploadEndpoint, {
+      // Use blob upload for large files
+      const response = await fetch('/api/upload-blob', {
         method: 'POST',
         body: formData
       })

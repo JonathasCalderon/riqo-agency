@@ -4,7 +4,8 @@
       "maxDuration": 60
     },
     "src/app/api/upload-blob/route.ts": {
-      "maxDuration": 60
+      "maxDuration": 60,
+      "memory": 1024
     },
     "src/app/api/upload/status/[uploadId]/route.ts": {
       "maxDuration": 10

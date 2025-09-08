@@ -106,6 +106,15 @@ export async function POST(request: NextRequest) {
 
     // Upload file to Vercel Blob
     const fileName = `uploads/${uploadRecord.id}/${file.name}`
+
+    // Check if blob token is configured
+    if (!process.env.BLOB_READ_WRITE_TOKEN) {
+      return NextResponse.json(
+        { error: 'Blob storage not configured. Please set BLOB_READ_WRITE_TOKEN environment variable.' },
+        { status: 500 }
+      )
+    }
+
     const blob = await put(fileName, file, {
       access: 'public',
     })
