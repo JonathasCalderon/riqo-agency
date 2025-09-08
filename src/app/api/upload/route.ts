@@ -14,7 +14,10 @@ import * as XLSX from 'xlsx'
  */
 function getTempDir(uploadId: string): string {
   // Use system temp directory for production compatibility
-  return join(tmpdir(), 'riqo-uploads', uploadId)
+  // In Vercel, this will be /tmp which is writable
+  const tempPath = join(tmpdir(), 'riqo-uploads', uploadId)
+  console.log(`Temp directory path: ${tempPath}`)
+  return tempPath
 }
 
 /**
@@ -34,12 +37,14 @@ async function ensureTempDir(uploadId: string): Promise<string> {
 
 export async function POST(request: NextRequest) {
   try {
+    console.log('Upload API called - Environment:', process.env.NODE_ENV)
     const supabase = await createClient()
 
     // Check if user is authenticated
     const { data: { user }, error: authError } = await supabase.auth.getUser()
 
     if (authError || !user) {
+      console.error('Authentication error:', authError)
       return NextResponse.json(
         { error: 'Unauthorized' },
         { status: 401 }
@@ -92,6 +97,14 @@ export async function POST(request: NextRequest) {
       console.log(`Large file detected (${fileSizeInMB.toFixed(2)}MB) - processing may take longer`)
     }
 
+    // Check if file is too large for serverless processing
+    if (fileSizeInMB > 25) {
+      return NextResponse.json(
+        { error: `File size (${fileSizeInMB.toFixed(2)}MB) is too large for serverless processing. Please reduce the file size to under 25MB or split it into smaller files.` },
+        { status: 400 }
+      )
+    }
+
     // Get user profile with client configuration
     const { data: profile, error: profileError } = await supabase
       .from('profiles')
@@ -136,7 +149,9 @@ export async function POST(request: NextRequest) {
     }
 
     // Process the file asynchronously
-    processFileAsync(file, profile, uploadRecord.id, supabase)
+    processFileAsync(file, profile, uploadRecord.id, supabase).catch(error => {
+      console.error('Async processing error:', error)
+    })
 
     return NextResponse.json({
       message: 'File upload started',
@@ -148,8 +163,19 @@ export async function POST(request: NextRequest) {
 
   } catch (error) {
     console.error('Upload error:', error)
+
+    // Provide more specific error information
+    let errorMessage = 'Internal server error'
+    if (error instanceof Error) {
+      errorMessage = error.message
+      console.error('Error stack:', error.stack)
+    }
+
     return NextResponse.json(
-      { error: 'Internal server error' },
+      {
+        error: errorMessage,
+        details: process.env.NODE_ENV === 'development' ? (error instanceof Error ? error.stack : String(error)) : undefined
+      },
       { status: 500 }
     )
   }
