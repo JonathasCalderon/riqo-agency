@@ -7,7 +7,7 @@ import { getFileContentWithProperEncoding, validateCsvContent, logEncodingStats 
 
 export async function POST(request: NextRequest) {
   try {
-    console.log('Blob Upload API called - Environment:', process.env.NODE_ENV)
+    console.log('Blob Upload API called - Environment:', process.env.NODE_ENV, 'Timestamp:', new Date().toISOString())
     const supabase = await createClient()
 
     // Check if user is authenticated

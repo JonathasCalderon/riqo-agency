@@ -54,9 +54,13 @@ export default function DashboardPage() {
       formData.append('file', file)
 
       // Use blob upload for large files
-      const response = await fetch('/api/upload-blob', {
+      const uploadUrl = '/api/upload-blob'
+      console.log('Uploading to:', uploadUrl)
+
+      const response = await fetch(uploadUrl, {
         method: 'POST',
-        body: formData
+        body: formData,
+        cache: 'no-cache' // Prevent caching issues
       })
 
       // Check if response is JSON
