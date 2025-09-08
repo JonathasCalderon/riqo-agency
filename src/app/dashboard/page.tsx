@@ -11,7 +11,7 @@ import Image from "next/image"
 import Link from "next/link"
 
 export default function DashboardPage() {
-  // VERSION: BLOB-UPLOAD-v3.0 - Force cache invalidation
+  // VERSION: FORCE-DEPLOY-v4.0 - Force new deployment
   const [user, setUser] = useState<any>(null)
   const [loading, setLoading] = useState(true)
   const [file, setFile] = useState<File | null>(null)
@@ -64,51 +64,73 @@ export default function DashboardPage() {
     setUploading(true)
     setUploadError('')
     setUploadSuccess(false)
-    setUploadStatus('Uploading file...')
+    setUploadStatus('Uploading file to storage...')
 
     try {
-      const formData = new FormData()
-      formData.append('file', file)
+      // For Hobby plan: Upload directly to blob storage first, then process
+      console.log('🚀 HOBBY PLAN: Direct blob upload for file:', file.name, file.size)
 
-      // USE THE WORKING UPLOAD ENDPOINT (not blob)
-      const timestamp = Date.now()
-      const uploadUrl = `/api/upload?v=${timestamp}`
-      console.log('🚀🚀🚀 UPLOADING TO UPLOAD ENDPOINT:', uploadUrl)
-      console.log('🔍 Cache bust timestamp:', timestamp)
-      console.log('🌐 User agent:', navigator.userAgent)
-
-      // Add a visible alert to confirm we're using the right endpoint
-      console.warn('USING BLOB ENDPOINT - CHECK NETWORK TAB FOR /api/upload-blob')
-
-      const response = await fetch(uploadUrl, {
+      // Step 1: Get upload URL from our API
+      setUploadStatus('Getting upload URL...')
+      const uploadUrlResponse = await fetch('/api/upload-url', {
         method: 'POST',
-        body: formData,
-        cache: 'no-cache',
         headers: {
-          'Cache-Control': 'no-cache, no-store, must-revalidate',
-          'Pragma': 'no-cache',
-          'Expires': '0',
-          'X-Cache-Bust': timestamp.toString()
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          filename: file.name,
+          contentType: file.type,
+          size: file.size
+        })
+      })
+
+      if (!uploadUrlResponse.ok) {
+        throw new Error('Failed to get upload URL')
+      }
+
+      const { uploadUrl, blobUrl, uploadId } = await uploadUrlResponse.json()
+      console.log('📝 Got upload URL:', uploadUrl)
+
+      // Step 2: Upload directly to blob storage
+      setUploadStatus('Uploading file to storage...')
+      const blobUploadResponse = await fetch(uploadUrl, {
+        method: 'PUT',
+        body: file,
+        headers: {
+          'Content-Type': file.type,
         }
       })
 
-      // Check if response is JSON
-      const contentType = response.headers.get('content-type')
-      if (!contentType || !contentType.includes('application/json')) {
-        const textResponse = await response.text()
-        console.error('Non-JSON response:', textResponse)
-        throw new Error(`Server returned non-JSON response. Status: ${response.status}`)
+      if (!blobUploadResponse.ok) {
+        throw new Error('Failed to upload file to storage')
       }
 
-      const result = await response.json()
+      console.log('✅ File uploaded to blob storage')
 
-      if (!response.ok) {
-        throw new Error(result.error || 'Upload failed')
-      }
-
-      // Start polling for upload status
+      // Step 3: Trigger processing
       setUploadStatus('Processing file...')
-      await pollUploadStatus(result.uploadId)
+      const processResponse = await fetch('/api/process-blob', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          blobUrl,
+          uploadId,
+          filename: file.name
+        })
+      })
+
+      if (!processResponse.ok) {
+        throw new Error('Failed to start file processing')
+      }
+
+      const result = await processResponse.json()
+      console.log('✅ Processing started:', result)
+
+      // Step 4: Poll for completion
+      setUploadStatus('Processing data...')
+      await pollUploadStatus(uploadId)
 
     } catch (error) {
       console.error('Upload error:', error)

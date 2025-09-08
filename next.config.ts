@@ -13,7 +13,7 @@ const nextConfig: NextConfig = {
   },
   // Force cache invalidation
   generateBuildId: async () => {
-    return `blob-upload-v3-${Date.now()}`
+    return `force-deploy-v4-${Date.now()}`
   },
 };
 

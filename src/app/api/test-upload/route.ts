@@ -1,11 +1,12 @@
 import { NextRequest, NextResponse } from 'next/server'
 
 export async function GET() {
-  console.log('🔍 TEST ENDPOINT CALLED - GET')
+  console.log('🔍 TEST ENDPOINT CALLED - GET - FORCE DEPLOY v4')
   return NextResponse.json({
-    message: 'Test endpoint working',
+    message: 'Test endpoint working - FORCE DEPLOY v4',
     timestamp: new Date().toISOString(),
-    method: 'GET'
+    method: 'GET',
+    deployVersion: 'v4.0'
   })
 }
 
