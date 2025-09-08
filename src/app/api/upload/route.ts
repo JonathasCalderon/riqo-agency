@@ -4,10 +4,10 @@ import { NextRequest, NextResponse } from 'next/server'
 import { writeFile, mkdir, rm } from 'fs/promises'
 import { join } from 'path'
 import { tmpdir } from 'os'
-import { spawn } from 'child_process'
 import { readFile } from 'fs/promises'
 import Papa, { ParseError } from 'papaparse'
 import { getFileContentWithProperEncoding, validateCsvContent, logEncodingStats } from '@/lib/encoding-utils'
+import * as XLSX from 'xlsx'
 
 /**
  * Get a safe temporary directory path for the upload
@@ -217,7 +217,7 @@ async function processFileAsync(file: File, profile: any, uploadId: string, supa
       csvPath = join(tempDir, csvFileName)
 
       try {
-        // Convert Excel to CSV using Python
+        // Convert Excel to CSV using JavaScript
         await convertExcelToCsv(inputPath, csvPath)
         console.log(`Successfully converted Excel file to CSV: ${csvPath}`)
       } catch (conversionError) {
@@ -440,132 +440,146 @@ async function processFileAsync(file: File, profile: any, uploadId: string, supa
 }
 
 /**
- * Convert Excel file to CSV using Python with improved error handling
+ * Convert Excel file to CSV using JavaScript XLSX library
  */
 async function convertExcelToCsv(inputPath: string, outputPath: string): Promise<void> {
-  return new Promise((resolve, reject) => {
-    // Escape paths for Windows compatibility
-    const escapedInputPath = inputPath.replace(/\\/g, '\\\\')
-    const escapedOutputPath = outputPath.replace(/\\/g, '\\\\')
-
-    const pythonScript = `
-import pandas as pd
-import sys
-import os
-from pathlib import Path
-
-try:
-    # Verify input file exists
-    input_file = r'${escapedInputPath}'
-    if not os.path.exists(input_file):
-        raise FileNotFoundError(f"Input file not found: {input_file}")
-
-    # Simple Excel reading with basic error handling
-    try:
-        df = pd.read_excel(input_file, engine='openpyxl')
-        print("Successfully read Excel file with openpyxl")
-    except Exception as e1:
-        try:
-            df = pd.read_excel(input_file, engine='xlrd')
-            print("Successfully read Excel file with xlrd")
-        except Exception as e2:
-            raise Exception(f"Failed to read Excel file. openpyxl error: {str(e1)}, xlrd error: {str(e2)}")
-
-    # Validate that we have data
-    if df.empty:
-        raise Exception("Excel file is empty or contains no readable data")
-
-    # Clean column names (remove extra spaces, special characters)
-    df.columns = df.columns.astype(str).str.strip()
-
-    # Convert to CSV with UTF-8 encoding
-    output_file = r'${escapedOutputPath}'
-    df.to_csv(output_file, index=False, encoding='utf-8')
-
-    # Verify output file was created
-    if not os.path.exists(output_file):
-        raise Exception("CSV output file was not created successfully")
-
-    print(f"SUCCESS: Converted {len(df)} rows and {len(df.columns)} columns")
-
-except Exception as e:
-    print(f"ERROR: {str(e)}")
-    sys.exit(1)
-`
-
+  try {
     console.log('Starting Excel to CSV conversion...')
     console.log('Input path:', inputPath)
     console.log('Output path:', outputPath)
 
-    // Use the virtual environment Python
-    const venvPythonPath = join(process.cwd(), 'venv', 'bin', 'python')
-    console.log('Using virtual environment Python:', venvPythonPath)
+    // Read the Excel file
+    const fileBuffer = await readFile(inputPath)
+    console.log(`Excel file loaded successfully. Size: ${fileBuffer.length} bytes`)
 
-    const pythonProcess = spawn(venvPythonPath, ['-c', pythonScript])
-    let output = ''
-    let error = ''
+    // Parse the Excel file
+    const workbook = XLSX.read(fileBuffer, { type: 'buffer' })
 
-    pythonProcess.stdout.on('data', (data) => {
-      const text = data.toString()
-      output += text
-      console.log('Python stdout:', text.trim())
-    })
+    // Get the first worksheet
+    const sheetName = workbook.SheetNames[0]
+    if (!sheetName) {
+      throw new Error('No worksheets found in Excel file')
+    }
 
-    pythonProcess.stderr.on('data', (data) => {
-      const text = data.toString()
-      error += text
-      console.error('Python stderr:', text.trim())
-    })
+    const worksheet = workbook.Sheets[sheetName]
+    console.log(`Processing worksheet: ${sheetName}`)
 
-    pythonProcess.on('close', (code) => {
-      console.log(`Python process exited with code: ${code}`)
-      console.log('Final output:', output.trim())
+    // Convert to CSV
+    const csvData = XLSX.utils.sheet_to_csv(worksheet)
 
-      if (code === 0 && output.includes('SUCCESS')) {
-        console.log('Excel conversion completed successfully')
-        resolve()
-      } else {
-        const errorMessage = error.trim() || output.trim() || 'Unknown conversion error'
-        console.error('Excel conversion failed:', errorMessage)
-        reject(new Error(`Excel conversion failed: ${errorMessage}`))
-      }
-    })
+    // Write CSV file
+    await writeFile(outputPath, csvData, 'utf-8')
+    console.log(`CSV file saved: ${outputPath}`)
+    console.log('Excel conversion completed successfully')
 
-    pythonProcess.on('error', (err) => {
-      console.error('Failed to start Python process:', err)
-      reject(new Error(`Failed to start Python process: ${err.message}. Make sure Python 3 is installed and available in PATH.`))
-    })
-  })
+  } catch (error) {
+    console.error('Excel conversion failed:', error)
+    throw new Error(`Excel conversion failed: ${error instanceof Error ? error.message : 'Unknown error'}`)
+  }
 }
 
 /**
- * Process CSV with Python script
+ * Process CSV with JavaScript - normalize dates, clean data, handle missing values
  */
-async function processCsvWithPython(inputPath: string, outputPath: string): Promise<void> {
-  return new Promise((resolve, reject) => {
-    const scriptPath = join(process.cwd(), 'scripts', 'process_csv.py')
-    const venvPythonPath = join(process.cwd(), 'venv', 'bin', 'python')
-    const pythonProcess = spawn(venvPythonPath, [scriptPath, inputPath, outputPath])
+async function processCsvWithJavaScript(inputPath: string, outputPath: string): Promise<void> {
+  try {
+    console.log('Starting CSV processing...')
+    console.log('Input path:', inputPath)
+    console.log('Output path:', outputPath)
 
-    let output = ''
-    let error = ''
+    // Read the CSV file
+    const csvContent = await readFile(inputPath, 'utf-8')
 
-    pythonProcess.stdout.on('data', (data) => {
-      output += data.toString()
-    })
-
-    pythonProcess.stderr.on('data', (data) => {
-      error += data.toString()
-    })
-
-    pythonProcess.on('close', (code) => {
-      if (code === 0) {
-        resolve()
-      } else {
-        reject(new Error(`CSV processing failed: ${error || output}`))
+    // Parse CSV
+    const parseResult = Papa.parse(csvContent, {
+      header: true,
+      skipEmptyLines: true,
+      transformHeader: (header: string) => {
+        // Standardize column names: lowercase, replace spaces with underscores
+        return header.toLowerCase().replace(/[^\w\s]/g, '').replace(/\s+/g, '_').trim()
       }
     })
-  })
+
+    if (parseResult.errors.length > 0) {
+      console.warn('CSV parsing warnings:', parseResult.errors)
+    }
+
+    let data = parseResult.data as any[]
+    console.log(`Loaded ${data.length} rows with ${Object.keys(data[0] || {}).length} columns`)
+
+    // Process the data
+    data = data.map((row: any) => {
+      const processedRow: any = {}
+
+      for (const [key, value] of Object.entries(row)) {
+        let processedValue = value
+
+        // Handle missing values
+        if (value === null || value === undefined || value === '') {
+          processedValue = ''
+        }
+        // Detect and normalize dates
+        else if (typeof value === 'string' && isDateLike(value)) {
+          processedValue = normalizeDate(value)
+        }
+        // Clean numeric values
+        else if (typeof value === 'string' && isNumericLike(value)) {
+          processedValue = cleanNumericValue(value)
+        }
+
+        processedRow[key] = processedValue
+      }
+
+      return processedRow
+    })
+
+    // Convert back to CSV
+    const processedCsv = Papa.unparse(data)
+
+    // Write processed CSV
+    await writeFile(outputPath, processedCsv, 'utf-8')
+    console.log(`Processed CSV saved: ${outputPath}`)
+    console.log('CSV processing completed successfully')
+
+  } catch (error) {
+    console.error('CSV processing failed:', error)
+    throw new Error(`CSV processing failed: ${error instanceof Error ? error.message : 'Unknown error'}`)
+  }
+}
+
+// Helper functions for CSV processing
+function isDateLike(value: string): boolean {
+  const datePatterns = [
+    /^\d{4}-\d{2}-\d{2}/, // YYYY-MM-DD
+    /^\d{2}\/\d{2}\/\d{4}/, // DD/MM/YYYY or MM/DD/YYYY
+    /^\d{2}-\d{2}-\d{4}/, // DD-MM-YYYY
+    /^\d{1,2}\/\d{1,2}\/\d{2,4}/ // D/M/YY
+  ]
+  return datePatterns.some(pattern => pattern.test(value))
+}
+
+function normalizeDate(value: string): string {
+  try {
+    const date = new Date(value)
+    if (!isNaN(date.getTime())) {
+      return date.toISOString().split('T')[0] // Return YYYY-MM-DD format
+    }
+  } catch (e) {
+    // If date parsing fails, return original value
+  }
+  return value
+}
+
+function isNumericLike(value: string): boolean {
+  const numericPattern = /^[\$\€\£]?[\d,]+\.?\d*$/
+  return numericPattern.test(value.trim())
+}
+
+function cleanNumericValue(value: string): string {
+  // Remove currency symbols and commas, keep the number
+  const cleaned = value.replace(/[\$\€\£,]/g, '').trim()
+  const num = parseFloat(cleaned)
+  return isNaN(num) ? value : num.toString()
 }
 
 /**
