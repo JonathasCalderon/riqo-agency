@@ -1,9 +1,5 @@
 "use client"
 
-// Force dynamic rendering - disable static optimization
-export const dynamic = 'force-dynamic'
-export const revalidate = 0
-
 import { useEffect, useState } from "react"
 import { useRouter } from "next/navigation"
 import { createClient } from "@/lib/supabase/client"

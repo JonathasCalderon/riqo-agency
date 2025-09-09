@@ -7,15 +7,11 @@ const nextConfig: NextConfig = {
   images: {
     domains: ['localhost'],
   },
-  // Disable static optimization and PPR to fix deployment caching issues
+  // Enable static optimization where possible
   experimental: {
     optimizePackageImports: ['lucide-react'],
-    // Disable Partial Prerendering to prevent caching issues
-    ppr: false,
   },
-  // Force dynamic rendering globally
-  output: 'standalone',
-  // Add cache control headers
+  // Add cache control headers to prevent caching issues
   async headers() {
     return [
       {
@@ -48,7 +44,7 @@ const nextConfig: NextConfig = {
   },
   // Force cache invalidation
   generateBuildId: async () => {
-    return `dynamic-v5-${Date.now()}`
+    return `cache-fix-v6-${Date.now()}`
   },
 };
 
