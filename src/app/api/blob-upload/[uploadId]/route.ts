@@ -2,6 +2,9 @@ import { createClient } from '@/lib/supabase/server'
 import { NextRequest, NextResponse } from 'next/server'
 import { put } from '@vercel/blob'
 
+// Force dynamic rendering
+export const dynamic = 'force-dynamic'
+
 export async function PUT(
   request: NextRequest,
   context: { params: Promise<{ uploadId: string }> }

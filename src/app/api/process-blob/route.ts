@@ -4,6 +4,9 @@ import { NextRequest, NextResponse } from 'next/server'
 import Papa, { ParseError } from 'papaparse'
 import { validateCsvContent } from '@/lib/encoding-utils'
 
+// Force dynamic rendering
+export const dynamic = 'force-dynamic'
+
 export async function POST(request: NextRequest) {
   try {
     console.log('⚙️ Process Blob API called')
