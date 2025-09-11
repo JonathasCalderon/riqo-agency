@@ -174,7 +174,7 @@
     "backToSignIn": "Volver a Iniciar Sesión"
   },
   "dashboard": {
-    "welcome": "Bienvenido",
+    "welcome": "Bienvenido Prueba",
     "title": "Panel de Control",
     "description": "Sube tus archivos CSV y gestiona tus visualizaciones de datos",
     "uploadCsv": "Subir Archivo CSV",
