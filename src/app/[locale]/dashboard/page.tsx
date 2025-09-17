@@ -9,6 +9,7 @@ import { useTranslations } from 'next-intl'
 import { useAuth } from '@/lib/auth/auth-context'
 import { ProtectedRoute } from '@/components/auth/protected-route'
 import { Navigation } from '@/components/navigation'
+import { upload } from '@vercel/blob/client'
 
 function DashboardContent() {
   const [file, setFile] = useState<File | null>(null)
@@ -56,52 +57,22 @@ function DashboardContent() {
     setUploadStatus(t('uploadingFile'))
 
     try {
-      // For large files, use the blob upload flow to avoid Vercel limits
-      console.log('🚀 BLOB UPLOAD: Starting upload for file:', file.name, file.size)
+      // Use Vercel Blob client-side upload to bypass serverless function limits
+      console.log('🚀 CLIENT-SIDE BLOB UPLOAD: Starting upload for file:', file.name, file.size)
 
-      // Step 1: Get upload URL from our API
+      // Upload directly to Vercel Blob from the client
       setUploadStatus(t('uploadingFile'))
-      const uploadUrlResponse = await fetch('/api/upload-url', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          filename: file.name,
-          contentType: file.type,
-          size: file.size
-        })
+      const blob = await upload(file.name, file, {
+        access: 'public',
+        handleUploadUrl: '/api/blob-upload-handler',
       })
 
-      if (!uploadUrlResponse.ok) {
-        throw new Error('Failed to get upload URL')
-      }
+      console.log('✅ File uploaded to blob storage:', blob.url)
 
-      const { uploadUrl, uploadId } = await uploadUrlResponse.json()
-      console.log('📝 Got upload URL:', uploadUrl)
-
-      // Step 2: Upload directly to blob storage using form data
-      setUploadStatus(t('uploadingFile'))
-      const formData = new FormData()
-      formData.append('file', file)
-      formData.append('uploadId', uploadId)
-
-      const blobUploadResponse = await fetch(uploadUrl, {
-        method: 'POST',
-        body: formData
-      })
-
-      if (!blobUploadResponse.ok) {
-        throw new Error('Failed to upload file to storage')
-      }
-
-      const uploadResult = await blobUploadResponse.json()
-      console.log('✅ File uploaded to blob storage:', uploadResult.blobUrl)
-
-      // Step 3: Processing starts automatically after blob upload
-      // Just poll for completion
+      // The upload handler will automatically start processing
+      // Poll for completion using the blob URL to find the upload record
       setUploadStatus(t('processingFile'))
-      await pollUploadStatus(uploadId)
+      await pollUploadStatusByBlobUrl(blob.url)
 
     } catch (error) {
       console.error('Upload error:', error)
@@ -110,6 +81,47 @@ function DashboardContent() {
     } finally {
       setUploading(false)
     }
+  }
+
+  const pollUploadStatusByBlobUrl = async (blobUrl: string) => {
+    const maxAttempts = 60 // 5 minutes max
+    let attempts = 0
+
+    const poll = async (): Promise<void> => {
+      try {
+        // Find upload record by blob URL
+        const response = await fetch(`/api/upload-blob/status-by-url?blobUrl=${encodeURIComponent(blobUrl)}`)
+        const status = await response.json()
+
+        if (!response.ok) {
+          throw new Error(status.error || 'Failed to check upload status')
+        }
+
+        const statusMessage = getStatusMessage(status.status)
+        const detailedMessage = getDetailedStatusMessage(status)
+        setUploadStatus(detailedMessage || statusMessage)
+
+        if (status.status === 'completed') {
+          setUploadStatus(getDetailedStatusMessage(status))
+          setFile(null)
+          return
+        } else if (status.status === 'failed') {
+          throw new Error(getDetailedStatusMessage(status) || status.error_message || 'Upload processing failed')
+        } else if (status.status === 'processing' || status.status === 'pending') {
+          attempts++
+          if (attempts < maxAttempts) {
+            setTimeout(poll, 5000) // Poll every 5 seconds
+          } else {
+            throw new Error('Upload timeout - processing is taking too long')
+          }
+        }
+      } catch (error) {
+        setUploadStatus(`${t('uploadFailed')}: ${error instanceof Error ? error.message : t('unknownError')}`)
+        setTimeout(() => setUploadStatus(''), 5000)
+      }
+    }
+
+    await poll()
   }
 
   const pollUploadStatus = async (uploadId: string) => {
