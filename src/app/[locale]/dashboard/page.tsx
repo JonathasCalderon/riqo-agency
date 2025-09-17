@@ -124,6 +124,8 @@ function DashboardContent() {
     await poll()
   }
 
+  // Legacy function - kept for compatibility but not used in new blob upload flow
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
   const pollUploadStatus = async (uploadId: string) => {
     const maxAttempts = 60 // 5 minutes max
     let attempts = 0

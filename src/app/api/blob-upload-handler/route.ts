@@ -2,6 +2,7 @@ import { handleUpload, type HandleUploadBody } from '@vercel/blob/client'
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@/lib/supabase/server'
 import { ClientDatabaseManager } from '@/lib/supabase/client-db'
+import { Profile } from '@/types/database'
 
 // Force dynamic rendering
 export const dynamic = 'force-dynamic'
@@ -15,7 +16,8 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
       request,
       onBeforeGenerateToken: async (
         pathname: string,
-        clientPayload?: string,
+        _clientPayload: string | null,
+        _multipart: boolean,
       ) => {
         // Generate a client token for the browser to upload the file
         console.log('🔐 Generating token for blob upload:', pathname)
@@ -59,7 +61,7 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
 
         try {
           const payload = JSON.parse(tokenPayload || '{}')
-          const { userId, userEmail, profileId } = payload
+          const { userId, profileId } = payload
 
           if (!userId) {
             throw new Error('Missing user information in token payload')
@@ -86,7 +88,7 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
               user_id: userId,
               file_name: `processed_${Date.now()}_${blob.pathname}`,
               original_file_name: blob.pathname,
-              file_size: blob.size,
+              file_size: 0, // Will be updated during processing
               mime_type: 'text/csv',
               processing_status: 'pending',
               blob_url: blob.url
@@ -124,12 +126,12 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
 }
 
 // Import the processing function from the existing upload-blob route
-async function processFileFromBlob(blobUrl: string, profile: any, uploadId: string, supabase: any) {
+async function processFileFromBlob(blobUrl: string, profile: Profile, uploadId: string, supabaseClient: Awaited<ReturnType<typeof createClient>>) {
   try {
     console.log('🔄 Starting file processing from blob:', blobUrl)
 
     // Update status to processing
-    await supabase
+    await supabaseClient
       .from('data_uploads')
       .update({ processing_status: 'processing' })
       .eq('id', uploadId)
@@ -141,7 +143,8 @@ async function processFileFromBlob(blobUrl: string, profile: any, uploadId: stri
     }
 
     const fileContent = await response.text()
-    console.log(`📄 Downloaded file content: ${fileContent.length} characters`)
+    const fileSize = new Blob([fileContent]).size
+    console.log(`📄 Downloaded file content: ${fileContent.length} characters, ${fileSize} bytes`)
 
     // Process the CSV content (simplified version)
     const lines = fileContent.split('\n').filter(line => line.trim().length > 0)
@@ -149,8 +152,8 @@ async function processFileFromBlob(blobUrl: string, profile: any, uploadId: stri
       throw new Error('CSV must have at least a header row and one data row')
     }
 
-    // Create client database manager
-    const clientDbManager = new ClientDatabaseManager(profile.client_database_url)
+    // Ensure client database connection is available
+    ClientDatabaseManager.getClientConnection(profile, true)
 
     // Process and insert data (this is a simplified version)
     // In a real implementation, you'd want to use the full processing logic
@@ -165,13 +168,14 @@ async function processFileFromBlob(blobUrl: string, profile: any, uploadId: stri
     })
 
     // Insert data into client database
-    await clientDbManager.insertData('uploaded_data', dataRows)
+    await ClientDatabaseManager.insertData(profile, dataRows)
 
     // Update upload record as completed
-    await supabase
+    await supabaseClient
       .from('data_uploads')
       .update({
         processing_status: 'completed',
+        file_size: fileSize,
         rows_processed: dataRows.length,
         columns_processed: headers.length,
         client_database_synced: true,
@@ -185,7 +189,7 @@ async function processFileFromBlob(blobUrl: string, profile: any, uploadId: stri
     console.error('Processing error:', error)
 
     // Update upload record as failed
-    await supabase
+    await supabaseClient
       .from('data_uploads')
       .update({
         processing_status: 'failed',
