@@ -51,17 +51,19 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
           tokenPayload: JSON.stringify({
             userId: user.id,
             userEmail: user.email,
-            profileId: profile.id,
+            // Note: user.id and profile.id should be the same
           }),
         }
       },
       onUploadCompleted: async ({ blob, tokenPayload }) => {
         // Get notified of client upload completion
         console.log('📁 Blob upload completed:', blob.url)
+        console.log('🔍 Token payload:', tokenPayload)
 
         try {
           const payload = JSON.parse(tokenPayload || '{}')
-          const { userId, profileId } = payload
+          const { userId } = payload
+          console.log('👤 Processing upload for user:', userId)
 
           if (!userId) {
             throw new Error('Missing user information in token payload')
@@ -70,18 +72,28 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
           // Create Supabase client
           const supabase = await createClient()
 
-          // Get user profile
+          // Get user profile (userId and profile.id should be the same)
           const { data: profile, error: profileError } = await supabase
             .from('profiles')
             .select('*')
-            .eq('id', profileId)
+            .eq('id', userId)
             .single()
 
+          console.log('📋 Profile query result:', { profile: !!profile, error: profileError })
+
           if (profileError || !profile) {
-            throw new Error('User profile not found')
+            console.error('❌ Profile error:', profileError)
+            throw new Error(`User profile not found: ${profileError?.message || 'Unknown error'}`)
           }
 
+          console.log('🔧 Profile config:', {
+            hasClientDb: !!profile.client_database_url,
+            hasServiceKey: !!profile.client_database_service_key,
+            tableName: profile.data_table_name
+          })
+
           // Create upload record
+          console.log('📝 Creating upload record...')
           const { data: uploadRecord, error: uploadError } = await supabase
             .from('data_uploads')
             .insert({
@@ -97,20 +109,22 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
             .single()
 
           if (uploadError) {
-            console.error('Failed to create upload record:', uploadError)
-            throw new Error('Failed to create upload record')
+            console.error('❌ Failed to create upload record:', uploadError)
+            throw new Error(`Failed to create upload record: ${uploadError.message}`)
           }
 
-          console.log('📝 Created upload record:', uploadRecord.id)
+          console.log('✅ Created upload record:', uploadRecord.id)
 
           // Start processing the file asynchronously
+          console.log('🚀 Starting async file processing...')
           processFileFromBlob(blob.url, profile, uploadRecord.id, supabase).catch(error => {
-            console.error('Async processing error:', error)
+            console.error('❌ Async processing error:', error)
           })
 
         } catch (error) {
-          console.error('Error in onUploadCompleted:', error)
-          throw new Error('Could not process upload completion')
+          console.error('❌ Error in onUploadCompleted:', error)
+          // Don't throw here as it would cause the upload to fail
+          // The error will be logged and the upload record won't be created
         }
       },
     })
@@ -129,14 +143,22 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
 async function processFileFromBlob(blobUrl: string, profile: Profile, uploadId: string, supabaseClient: Awaited<ReturnType<typeof createClient>>) {
   try {
     console.log('🔄 Starting file processing from blob:', blobUrl)
+    console.log('👤 Profile info:', {
+      id: profile.id,
+      hasClientDb: !!profile.client_database_url,
+      hasServiceKey: !!profile.client_database_service_key,
+      tableName: profile.data_table_name
+    })
 
     // Update status to processing
+    console.log('📝 Updating status to processing...')
     await supabaseClient
       .from('data_uploads')
       .update({ processing_status: 'processing' })
       .eq('id', uploadId)
 
     // Download file from blob
+    console.log('⬇️ Downloading file from blob...')
     const response = await fetch(blobUrl)
     if (!response.ok) {
       throw new Error(`Failed to download file from blob: ${response.status}`)
@@ -152,11 +174,17 @@ async function processFileFromBlob(blobUrl: string, profile: Profile, uploadId: 
       throw new Error('CSV must have at least a header row and one data row')
     }
 
-    // Ensure client database connection is available
-    ClientDatabaseManager.getClientConnection(profile, true)
+    // Test client database connection
+    console.log('🔗 Testing client database connection...')
+    const connectionTest = await ClientDatabaseManager.testConnection(profile)
+    if (!connectionTest.success) {
+      throw new Error(`Client database connection failed: ${connectionTest.error}`)
+    }
+    console.log('✅ Client database connection successful')
 
     // Process and insert data (this is a simplified version)
     // In a real implementation, you'd want to use the full processing logic
+    console.log('📊 Processing CSV data...')
     const headers = lines[0].split(',').map(h => h.trim().replace(/['"]/g, ''))
     const dataRows = lines.slice(1).map(line => {
       const values = line.split(',').map(v => v.trim().replace(/['"]/g, ''))
@@ -167,8 +195,18 @@ async function processFileFromBlob(blobUrl: string, profile: Profile, uploadId: 
       return row
     })
 
+    console.log(`📈 Processed ${dataRows.length} rows with ${headers.length} columns`)
+    console.log('📋 Headers:', headers)
+
     // Insert data into client database
-    await ClientDatabaseManager.insertData(profile, dataRows)
+    console.log('💾 Inserting data into client database...')
+    const insertResult = await ClientDatabaseManager.insertData(profile, dataRows)
+
+    if (!insertResult.success) {
+      throw new Error(`Failed to insert data: ${insertResult.error}`)
+    }
+
+    console.log(`✅ Successfully inserted ${insertResult.rowsInserted} rows`)
 
     // Update upload record as completed
     await supabaseClient
