@@ -86,6 +86,8 @@ function DashboardContent() {
   const pollUploadStatusByBlobUrl = async (blobUrl: string) => {
     const maxAttempts = 60 // 5 minutes max
     let attempts = 0
+    let recordNotFoundAttempts = 0
+    const maxRecordNotFoundAttempts = 10 // Allow up to 10 attempts for record creation
 
     const poll = async (): Promise<void> => {
       try {
@@ -94,8 +96,18 @@ function DashboardContent() {
         const status = await response.json()
 
         if (!response.ok) {
+          // If record not found, it might still be creating - wait a bit longer
+          if (response.status === 404 && recordNotFoundAttempts < maxRecordNotFoundAttempts) {
+            recordNotFoundAttempts++
+            setUploadStatus(`${t('processingFile')} (initializing...)`)
+            setTimeout(poll, 2000) // Check again in 2 seconds
+            return
+          }
           throw new Error(status.error || 'Failed to check upload status')
         }
+
+        // Reset the record not found counter once we find the record
+        recordNotFoundAttempts = 0
 
         const statusMessage = getStatusMessage(status.status)
         const detailedMessage = getDetailedStatusMessage(status)
@@ -121,7 +133,8 @@ function DashboardContent() {
       }
     }
 
-    await poll()
+    // Start polling after a small initial delay to allow the upload handler to create the record
+    setTimeout(poll, 1000) // Wait 1 second before first poll
   }
 
   // Legacy function - kept for compatibility but not used in new blob upload flow
