@@ -23,10 +23,18 @@ export async function POST(request: NextRequest) {
 
     const formData = await request.formData()
     const file = formData.get('file') as File
+    const uploadId = formData.get('uploadId') as string
 
     if (!file) {
       return NextResponse.json(
         { error: 'No file provided' },
+        { status: 400 }
+      )
+    }
+
+    if (!uploadId) {
+      return NextResponse.json(
+        { error: 'No upload ID provided' },
         { status: 400 }
       )
     }
@@ -83,24 +91,18 @@ export async function POST(request: NextRequest) {
       )
     }
 
-    // Create upload record
+    // Get existing upload record
     const { data: uploadRecord, error: uploadError } = await supabase
       .from('data_uploads')
-      .insert({
-        user_id: user.id,
-        file_name: `processed_${Date.now()}_${file.name}`,
-        original_file_name: file.name,
-        file_size: file.size,
-        mime_type: file.type || 'text/csv',
-        processing_status: 'pending'
-      })
-      .select()
+      .select('*')
+      .eq('id', uploadId)
+      .eq('user_id', user.id)
       .single()
 
-    if (uploadError) {
+    if (uploadError || !uploadRecord) {
       return NextResponse.json(
-        { error: 'Failed to create upload record' },
-        { status: 500 }
+        { error: 'Upload record not found' },
+        { status: 404 }
       )
     }
 

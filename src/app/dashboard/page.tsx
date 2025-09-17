@@ -88,47 +88,29 @@ export default function DashboardPage() {
         throw new Error('Failed to get upload URL')
       }
 
-      const { uploadUrl, blobUrl, uploadId } = await uploadUrlResponse.json()
+      const { uploadUrl, uploadId } = await uploadUrlResponse.json()
       console.log('📝 Got upload URL:', uploadUrl)
 
-      // Step 2: Upload directly to blob storage
+      // Step 2: Upload directly to blob storage using form data
       setUploadStatus('Uploading file to storage...')
+      const formData = new FormData()
+      formData.append('file', file)
+      formData.append('uploadId', uploadId)
+
       const blobUploadResponse = await fetch(uploadUrl, {
-        method: 'PUT',
-        body: file,
-        headers: {
-          'Content-Type': file.type,
-        }
+        method: 'POST',
+        body: formData
       })
 
       if (!blobUploadResponse.ok) {
         throw new Error('Failed to upload file to storage')
       }
 
-      console.log('✅ File uploaded to blob storage')
+      const uploadResult = await blobUploadResponse.json()
+      console.log('✅ File uploaded to blob storage:', uploadResult.blobUrl)
 
-      // Step 3: Trigger processing
-      setUploadStatus('Processing file...')
-      const processResponse = await fetch('/api/process-blob', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          blobUrl,
-          uploadId,
-          filename: file.name
-        })
-      })
-
-      if (!processResponse.ok) {
-        throw new Error('Failed to start file processing')
-      }
-
-      const result = await processResponse.json()
-      console.log('✅ Processing started:', result)
-
-      // Step 4: Poll for completion
+      // Step 3: Processing starts automatically after blob upload
+      // Just poll for completion
       setUploadStatus('Processing data...')
       await pollUploadStatus(uploadId)
 

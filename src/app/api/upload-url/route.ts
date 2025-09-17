@@ -92,16 +92,10 @@ export async function POST(request: NextRequest) {
       )
     }
 
-    // Generate blob upload URL
-    const blobFileName = `uploads/${uploadRecord.id}/${filename}`
-    
-    // For direct upload, we need to create a presigned URL
-    // Since Vercel Blob doesn't have presigned URLs, we'll use a different approach
-    const blobUrl = `https://blob.vercel-storage.com/${blobFileName}`
-    
+    // Return the upload record ID for direct blob upload
+    // The frontend will use the upload-blob endpoint with streaming
     return NextResponse.json({
-      uploadUrl: `/api/blob-upload/${uploadRecord.id}`, // Our proxy endpoint
-      blobUrl: blobUrl,
+      uploadUrl: `/api/upload-blob`, // Direct blob upload endpoint
       uploadId: uploadRecord.id,
       fileName: filename,
       fileSize: size
