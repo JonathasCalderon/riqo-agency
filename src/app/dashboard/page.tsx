@@ -311,7 +311,7 @@ export default function DashboardPage() {
                       disabled={uploading}
                     />
                     <p className="text-xs text-muted-foreground mt-1">
-                      Supported formats: CSV, Excel (.xlsx, .xls) - Max size: 50MB
+                      Supported formats: CSV, Excel (.xlsx, .xls) - Max size: 100MB
                     </p>
                   </div>
                   

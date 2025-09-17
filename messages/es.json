@@ -174,7 +174,7 @@
     "backToSignIn": "Volver a Iniciar Sesión"
   },
   "dashboard": {
-    "welcome": "Bienvenido Prueba",
+    "welcome": "Bienvenido",
     "title": "Panel de Control",
     "description": "Sube tus archivos CSV y gestiona tus visualizaciones de datos",
     "uploadCsv": "Subir Archivo CSV",
@@ -199,10 +199,11 @@
     "step3Desc": "Accede a tus dashboards y visualizaciones actualizados en tiempo real.",
     "databaseConfigured": "Base de datos configurada - Lista para subidas",
     "databaseNotConfigured": "Base de datos no configurada - Contacta soporte",
-    "supportsFiles": "Soporta archivos CSV y Excel (máx 50MB)",
+    "supportsFiles": "Soporta archivos CSV y Excel (máx 100MB)",
     "yourAccount": "Tu Cuenta",
     "clientDatabaseNotConfigured": "Base de datos del cliente no configurada. Por favor contacta soporte para configurar tu entorno de visualización de datos.",
     "uploadingFile": "Subiendo archivo...",
+    "processingFile": "Procesando archivo...",
     "fileUploadedSuccessfully": "¡Archivo subido exitosamente! Procesando...",
     "uploadFailed": "Subida falló",
     "status": "Estado",

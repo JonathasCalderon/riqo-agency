@@ -56,25 +56,73 @@ function DashboardContent() {
     setUploadStatus(t('uploadingFile'))
 
     try {
-      const formData = new FormData()
-      formData.append('file', file)
+      // For large files, use the blob upload flow to avoid Vercel limits
+      console.log('🚀 BLOB UPLOAD: Starting upload for file:', file.name, file.size)
 
-      const response = await fetch('/api/upload', {
+      // Step 1: Get upload URL from our API
+      setUploadStatus(t('uploadingFile'))
+      const uploadUrlResponse = await fetch('/api/upload-url', {
         method: 'POST',
-        body: formData
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          filename: file.name,
+          contentType: file.type,
+          size: file.size
+        })
       })
 
-      const result = await response.json()
-
-      if (response.ok) {
-        setUploadStatus(t('fileUploadedSuccessfully'))
-        // Poll for processing status
-        pollUploadStatus(result.uploadId)
-        setFile(null)
-      } else {
-        throw new Error(result.error || t('uploadFailed'))
+      if (!uploadUrlResponse.ok) {
+        throw new Error('Failed to get upload URL')
       }
+
+      const { uploadUrl, blobUrl, uploadId } = await uploadUrlResponse.json()
+      console.log('📝 Got upload URL:', uploadUrl)
+
+      // Step 2: Upload directly to blob storage
+      setUploadStatus(t('uploadingFile'))
+      const blobUploadResponse = await fetch(uploadUrl, {
+        method: 'PUT',
+        body: file,
+        headers: {
+          'Content-Type': file.type,
+        }
+      })
+
+      if (!blobUploadResponse.ok) {
+        throw new Error('Failed to upload file to storage')
+      }
+
+      console.log('✅ File uploaded to blob storage')
+
+      // Step 3: Trigger processing
+      setUploadStatus(t('processingFile'))
+      const processResponse = await fetch('/api/process-blob', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          blobUrl,
+          uploadId,
+          filename: file.name
+        })
+      })
+
+      if (!processResponse.ok) {
+        throw new Error('Failed to start file processing')
+      }
+
+      const result = await processResponse.json()
+      console.log('✅ Processing started:', result)
+
+      // Step 4: Poll for completion
+      setUploadStatus(t('processingFile'))
+      await pollUploadStatus(uploadId)
+
     } catch (error) {
+      console.error('Upload error:', error)
       setUploadStatus(`${t('uploadFailed')}: ${error instanceof Error ? error.message : t('unknownError')}`)
       setTimeout(() => setUploadStatus(''), 5000)
     } finally {
@@ -83,48 +131,81 @@ function DashboardContent() {
   }
 
   const pollUploadStatus = async (uploadId: string) => {
-    const maxAttempts = 30 // 5 minutes max
+    const maxAttempts = 60 // 5 minutes max
     let attempts = 0
 
-    const poll = async () => {
+    const poll = async (): Promise<void> => {
       try {
-        const response = await fetch(`/api/upload/status/${uploadId}`)
-        const result = await response.json()
+        const response = await fetch(`/api/upload-blob/status/${uploadId}`)
+        const status = await response.json()
 
-        if (response.ok) {
-          const statusText = result.rows_processed
-            ? `${result.rows_processed} ${t('rows')}, ${result.columns_processed || 0} ${t('columns')}`
-            : t('processing')
+        if (!response.ok) {
+          throw new Error(status.error || 'Failed to check upload status')
+        }
 
-          setUploadStatus(`${t('status')}: ${result.status} (${statusText})`)
+        const statusMessage = getStatusMessage(status.status)
+        const detailedMessage = getDetailedStatusMessage(status)
+        setUploadStatus(detailedMessage || statusMessage)
 
-          if (result.status === 'completed') {
-            const syncStatus = result.client_database_synced ? `✅ ${t('syncedToDashboard')}` : `⚠️ ${t('syncPending')}`
-            setUploadStatus(`✅ ${t('uploadCompletedSuccessfully')} ${syncStatus}`)
-            setTimeout(() => setUploadStatus(''), 8000)
-            return
-          } else if (result.status === 'failed') {
-            setUploadStatus(`❌ ${t('uploadFailedError')}: ${result.error_message || t('unknownError')}`)
-            setTimeout(() => setUploadStatus(''), 10000)
-            return
+        if (status.status === 'completed') {
+          setUploadStatus(getDetailedStatusMessage(status))
+          setFile(null)
+          return
+        } else if (status.status === 'failed') {
+          throw new Error(getDetailedStatusMessage(status) || status.error_message || 'Upload processing failed')
+        } else if (status.status === 'processing' || status.status === 'pending') {
+          attempts++
+          if (attempts < maxAttempts) {
+            setTimeout(poll, 5000) // Poll every 5 seconds
+          } else {
+            throw new Error('Upload timeout - processing is taking too long')
           }
         }
-
-        attempts++
-        if (attempts < maxAttempts) {
-          setTimeout(poll, 10000) // Poll every 10 seconds
-        } else {
-          setUploadStatus(`⏱️ ${t('uploadTakingLonger')}`)
-          setTimeout(() => setUploadStatus(''), 10000)
-        }
       } catch (error) {
-        console.error('Error polling upload status:', error)
-        setUploadStatus(t('errorCheckingUploadStatus'))
+        setUploadStatus(`${t('uploadFailed')}: ${error instanceof Error ? error.message : t('unknownError')}`)
         setTimeout(() => setUploadStatus(''), 5000)
       }
     }
 
-    poll()
+    await poll()
+  }
+
+  const getStatusMessage = (status: string): string => {
+    switch (status) {
+      case 'pending': return '⏳ Upload queued for processing...'
+      case 'processing': return '⚙️ Processing file and updating database...'
+      case 'completed': return '✅ Upload completed successfully!'
+      case 'failed': return '❌ Upload failed'
+      default: return '🔍 Checking status...'
+    }
+  }
+
+  const getDetailedStatusMessage = (statusData: any): string => {
+    if (!statusData) return ''
+
+    const { status, rows_processed, error_message, metadata } = statusData
+
+    switch (status) {
+      case 'completed':
+        const rowsText = rows_processed ? `${rows_processed} rows processed` : ''
+        const syncText = statusData.client_database_synced ? '✅ Synced to dashboard' : '⚠️ Sync pending'
+        return `✅ Upload completed successfully! ${rowsText} ${syncText}`
+
+      case 'failed':
+        return `❌ Upload failed: ${error_message || 'Unknown error'}`
+
+      case 'processing':
+        if (metadata?.current_step) {
+          return `⚙️ ${metadata.current_step}${rows_processed ? ` (${rows_processed} rows)` : ''}`
+        }
+        return `⚙️ Processing file${rows_processed ? ` (${rows_processed} rows processed)` : ''}...`
+
+      case 'pending':
+        return '⏳ Upload queued for processing...'
+
+      default:
+        return ''
+    }
   }
 
 
