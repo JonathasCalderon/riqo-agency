@@ -91,6 +91,12 @@ export interface Database {
           normalized_data_path: string | null
           client_database_synced: boolean
           sync_error_message: string | null
+          // Blob storage fields
+          blob_url: string | null
+          rows_processed: number | null
+          columns_processed: number | null
+          completed_at: string | null
+          error_message: string | null
         }
         Insert: {
           id?: string
@@ -113,6 +119,11 @@ export interface Database {
           normalized_data_path?: string | null
           client_database_synced?: boolean
           sync_error_message?: string | null
+          blob_url?: string | null
+          rows_processed?: number | null
+          columns_processed?: number | null
+          completed_at?: string | null
+          error_message?: string | null
         }
         Update: {
           id?: string
@@ -135,6 +146,11 @@ export interface Database {
           normalized_data_path?: string | null
           client_database_synced?: boolean
           sync_error_message?: string | null
+          blob_url?: string | null
+          rows_processed?: number | null
+          columns_processed?: number | null
+          completed_at?: string | null
+          error_message?: string | null
         }
       }
       dashboards: {
